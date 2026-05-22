@@ -1,0 +1,131 @@
+I want you to first deeply analyze and explain the product “Kinso AI” and similar AI universal inbox systems before building anything.
+
+Please explain:
+
+* What exactly Kinso AI is doing technically
+* How the architecture works behind the scenes
+* How they unify Gmail, Slack, WhatsApp, LinkedIn, Calendar, Contacts, and documents into one ecosystem
+* How the AI memory/context system likely works
+* How semantic search, embeddings, prioritization, and relationship intelligence are implemented
+
+IMPORTANT:
+Do NOT start creating the app yet.
+I only want the technical plan, architecture, feasibility analysis, and implementation roadmap first.
+
+I want a detailed engineering plan covering:
+
+1. Frontend architecture
+
+* Recommended frontend stack
+* Dashboard/UI structure
+* Realtime inbox architecture
+
+2. Backend architecture
+
+* APIs
+* Microservices vs monolith
+* Queue systems
+* Webhooks
+* Authentication
+* OAuth flows
+
+3. Database architecture
+
+* PostgreSQL schema ideas
+* Message normalization strategy
+* Contact graph structure
+* Vector database usage
+
+4. AI layer
+
+* Embeddings
+* Semantic search
+* Memory system
+* Priority scoring
+* Relationship intelligence
+* Suggested LLM stack
+
+5. Integrations
+   Explain how integrations would realistically work for:
+
+* Gmail
+* Slack
+* Google Calendar
+* WhatsApp
+* LinkedIn
+* Notion
+* Telegram
+
+Most important:
+I know WhatsApp and LinkedIn APIs are difficult/restricted.
+
+I want you to specifically explain:
+
+* What official APIs are available
+* What restrictions exist
+* What legal limitations exist
+* What workarounds startups usually use
+* Which approaches are scalable vs risky
+* Which integrations are realistically possible for an MVP
+
+For LinkedIn:
+
+* Explain whether inbox/message syncing is realistically possible
+* Explain browser automation risks
+* Explain compliance and account-ban risks
+
+For WhatsApp:
+
+* Explain differences between:
+
+  * WhatsApp Cloud API
+  * WhatsApp Business API
+  * Twilio WhatsApp
+  * Personal WhatsApp limitations
+
+6. Security and compliance
+
+* OAuth token storage
+* Encryption
+* GDPR/privacy concerns
+* Enterprise security considerations
+
+7. Suggested MVP scope
+   Tell me:
+
+* What features should be skipped initially
+* Which integrations should come first
+* What can realistically be built in 30 days
+* What should wait until later scaling stages
+
+8. Scalability
+
+* Event streaming
+* Sync architecture
+* Search indexing
+* Realtime updates
+* Rate limiting strategies
+
+9. Cost estimation
+   Estimate:
+
+* MVP infrastructure cost
+* AI cost
+* Vector DB cost
+* API cost
+* Estimated scaling cost
+
+10. Final recommendation
+    If YOU were building a Kinso-like AI relationship operating system today:
+
+* What exact stack would you choose?
+* What would your architecture diagram look like?
+* What would you avoid building initially?
+* What would be your unfair advantage for the Indian market?
+
+Again:
+DO NOT START CODING.
+DO NOT GENERATE FILES.
+DO NOT BUILD THE APP YET.
+
+I only want the full technical thinking, architecture plan, integration feasibility analysis, risks, and roadmap first.
