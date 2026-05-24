@@ -34,7 +34,8 @@ router.get("/contacts", requireAuth, async (req: Request, res: Response): Promis
       avatarUrl: c.avatarUrl ?? null,
       platforms: c.platforms ?? [],
       lastSeenAt: c.lastSeenAt?.toISOString() ?? null,
-      conversationCount: c.conversationCount,
+      relationshipScore: null,
+      activeConversationCount: c.conversationCount ?? 0,
     })),
     total: contacts.length,
   }));
@@ -66,10 +67,11 @@ router.get("/contacts/:id", requireAuth, async (req: Request, res: Response): Pr
     id: contact[0].id,
     displayName: contact[0].displayName,
     avatarUrl: contact[0].avatarUrl ?? null,
-    platforms: contact[0].platforms ?? [],
-    email: contact[0].email ?? null,
-    conversationCount: contact[0].conversationCount,
-    lastSeenAt: contact[0].lastSeenAt?.toISOString() ?? null,
+    identities: (contact[0].platforms ?? []).map((p: string) => ({
+      platform: p,
+      externalId: contact[0].id + "_" + p,
+      displayName: contact[0].displayName,
+    })),
     recentConversations: conversations.map((c) => ({
       id: c.id,
       platform: c.platform,
@@ -84,6 +86,9 @@ router.get("/contacts/:id", requireAuth, async (req: Request, res: Response): Pr
       lastMessageAt: c.lastMessageAt.toISOString(),
       unreadCount: c.unreadCount,
     })),
+    relationshipScore: null,
+    lastInteractionAt: contact[0].lastSeenAt?.toISOString() ?? null,
+    activeTopics: [],
   }));
 });
 

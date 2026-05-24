@@ -36,10 +36,10 @@ router.get("/notifications/settings", requireAuth, async (req: Request, res: Res
   }
 
   res.json(GetNotificationSettingsResponse.parse({
-    emailDigest: settings[0].emailDigest,
-    digestFrequency: settings[0].digestFrequency,
-    pushEnabled: settings[0].pushEnabled,
-    priorityOnly: settings[0].priorityOnly,
+    dailyDigest: settings[0].emailDigest,
+    digestTime: settings[0].digestFrequency,
+    trialReminders: false,
+    priorityAlerts: settings[0].pushEnabled || settings[0].priorityOnly,
   }));
 });
 
@@ -62,6 +62,7 @@ router.put("/notifications/settings", requireAuth, async (req: Request, res: Res
     digestFrequency: parsed.data.digestTime ?? "daily",
     pushEnabled: parsed.data.priorityAlerts ?? false,
     priorityOnly: parsed.data.priorityAlerts ?? false,
+    trialReminders: false,
   };
 
   if (!existing[0]) {
@@ -78,7 +79,12 @@ router.put("/notifications/settings", requireAuth, async (req: Request, res: Res
       .where(eq(notificationSettingsTable.userId, user.id));
   }
 
-  res.json(UpdateNotificationSettingsResponse.parse(parsed.data));
+  res.json(UpdateNotificationSettingsResponse.parse({
+    dailyDigest: parsed.data.dailyDigest,
+    digestTime: parsed.data.digestTime,
+    trialReminders: parsed.data.trialReminders,
+    priorityAlerts: parsed.data.priorityAlerts,
+  }));
 });
 
 export default router;

@@ -3,8 +3,48 @@ import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 
+const DEMO_USER_ID = "demo_user_xanda";
+const DEMO_CLERK_ID = "demo_clerk_id";
+
+async function ensureDemoUser(): Promise<typeof usersTable.$inferSelect> {
+  let user = await db.select().from(usersTable).where(eq(usersTable.id, DEMO_USER_ID)).limit(1);
+  if (!user[0]) {
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+    await db.insert(usersTable).values({
+      id: DEMO_USER_ID,
+      clerkId: DEMO_CLERK_ID,
+      email: "demo@xandacross.com",
+      firstName: "Demo",
+      lastName: "User",
+      status: "active",
+      trialEndsAt,
+    });
+    user = await db.select().from(usersTable).where(eq(usersTable.id, DEMO_USER_ID)).limit(1);
+  }
+  return user[0];
+}
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
+
+  // Demo mode: no Clerk configured -> use demo user for any bearer token
+  const clerkPublishableKey = process.env.VITE_CLERK_PUBLISHABLE_KEY;
+  const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+  const isDemoMode = !clerkPublishableKey || !clerkSecretKey;
+
+  if (isDemoMode) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const demoUser = await ensureDemoUser();
+    (req as any).user = demoUser;
+    next();
+    return;
+  }
+
+  // Production mode: Clerk JWT verification
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     res.status(401).json({ error: "Unauthorized" });
     return;
@@ -12,16 +52,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const token = authHeader.slice(7);
 
   try {
-    const clerkPublishableKey = process.env.VITE_CLERK_PUBLISHABLE_KEY;
-    if (!clerkPublishableKey) {
-      res.status(503).json({ error: "Auth service unavailable" });
-      return;
-    }
-
     const response = await fetch("https://api.clerk.com/v1/tokens/verify", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
+        Authorization: `Bearer ${clerkSecretKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ token }),

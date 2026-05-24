@@ -27,11 +27,11 @@ router.get("/accounts", requireAuth, async (req: Request, res: Response): Promis
     accounts: accounts.map((a) => ({
       id: a.id,
       platform: a.platform,
-      accountLabel: a.accountLabel ?? null,
-      email: a.email ?? null,
+      displayName: a.accountLabel ?? a.platform,
+      externalId: a.unipileAccountId ?? a.slackToken ?? null,
       status: a.status,
       lastSyncAt: a.lastSyncAt?.toISOString() ?? null,
-      messageCount: a.messageCount,
+      syncProgress: null,
     })),
   }));
 });
