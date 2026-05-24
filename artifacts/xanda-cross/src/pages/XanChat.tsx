@@ -52,7 +52,7 @@ export default function XanChat() {
             </div>
           ) : (
             <div className="space-y-6 pb-4">
-              {history?.messages.map((msg) => {
+              {(history?.messages ?? []).map((msg) => {
                 const isXan = msg.role === 'assistant';
                 return (
                   <div key={msg.id} className={`flex gap-4 ${isXan ? 'flex-row' : 'flex-row-reverse'}`}>
