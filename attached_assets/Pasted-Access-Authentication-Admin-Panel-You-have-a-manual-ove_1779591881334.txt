@@ -1,0 +1,62 @@
+Access & Authentication
+Admin Panel
+You have a manual override system built into your admin panel. Any new user who signs up via Clerk authentication is by default in a pending state — they cannot access the platform until they are enabled. There are two ways a user gets enabled:
+
+Manually — you or your team go into the admin panel and flip a switch to enable specific users. This is for your internal team members and testers who you want to give free access to during development.
+Automatically — the moment a user completes payment via Stripe, their account is instantly activated. No manual step needed. Stripe sends a webhook to your backend, your backend flips the user to active, and they are in.
+
+This gives you full control during early stage while still being completely hands-off once you launch publicly.
+
+Pricing Model — Customisable Plan
+Your pricing is not a fixed tiered plan. Instead the user builds their own plan by choosing exactly what they need. Here is how the pricing screen works:
+
+Base Plan — $10/month
+This is mandatory for all users and covers everything AI-powered:
+
+AI priority ranking of all messages
+AI message headlines
+AI auto-drafted replies
+Universal semantic search
+Contextual assistant (cross-platform message linking)
+Morning briefing and time-aware home screen
+Unlimited Slack accounts included — Slack is free because you are using Slack's official API directly at no per-account cost to you
+
+
+Add-On Accounts — $7 per account/month
+Below the base plan, the user sees a section listing every other supported platform with an icon. Next to each platform is a plus and minus button. The user clicks plus to add an account, minus to remove one. Each account they add costs $7/month and gets added to their total in real time as they adjust.
+Supported add-on platforms:
+
+Gmail
+Outlook
+WhatsApp
+LinkedIn
+Instagram
+Telegram
+
+Example pricing scenarios:
+What user selectsMonthly totalBase only + Slack$10/monthBase + 1 Gmail + 1 WhatsApp$24/monthBase + 1 LinkedIn + 1 Instagram + 1 Gmail$31/monthBase + 2 WhatsApp + 1 LinkedIn + 1 Gmail$38/month
+
+How the Pricing Screen Looks Logically
+[ AI Features + Slack Unlimited ]     $10/month
+─────────────────────────────────────────────────
+Add more accounts                     $7 per account
+
+  📧 Gmail          [ − ]  0  [ + ]      $0
+  📧 Outlook        [ − ]  0  [ + ]      $0
+  💬 WhatsApp       [ − ]  1  [ + ]      $7
+  💼 LinkedIn       [ − ]  1  [ + ]      $7
+  📸 Instagram      [ − ]  0  [ + ]      $0
+  ✈️ Telegram       [ − ]  0  [ + ]      $0
+─────────────────────────────────────────────────
+Total                                  $24/month
+
+[ Start my plan ]
+The total updates live as the user clicks plus or minus — before they even hit the payment button.
+
+Why This Model is Smart
+
+Low barrier to entry — $10 gets them in the door with full AI features and Slack
+Grows with the user — as their business grows and they add more accounts, your revenue per user grows naturally
+No wasted tiers — users only pay for exactly what they use
+Your costs are covered — at $7 per connected account you are comfortably covering your Unipile cost of $5.50 per account and keeping healthy margin on top
+Slack as a free hook — giving Slack free is a smart acquisition move since many business users live in Slack already
