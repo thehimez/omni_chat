@@ -3,13 +3,32 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Xanda Cross unified inbox API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication and user management
+  - name: messages
+    description: Unified message operations
+  - name: conversations
+    description: Conversation thread operations
+  - name: contacts
+    description: Contact profile operations
+  - name: accounts
+    description: Connected platform accounts
+  - name: xan
+    description: Xan AI assistant operations
+  - name: briefing
+    description: Daily briefing operations
+  - name: search
+    description: Semantic search operations
+  - name: notifications
+    description: Notification settings
+
 paths:
   /healthz:
     get:
@@ -24,13 +43,1082 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user profile
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+
+  /auth/status:
+    get:
+      operationId: getUserStatus
+      tags: [auth]
+      summary: Get user activation status
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: User status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStatus"
+
+  /briefing:
+    get:
+      operationId: getBriefing
+      tags: [briefing]
+      summary: Get personalised briefing for home screen
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Briefing data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Briefing"
+
+  /conversations:
+    get:
+      operationId: getConversations
+      tags: [conversations]
+      summary: Get all conversations ranked by AI priority
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: platform
+          in: query
+          schema:
+            type: string
+        - name: priority
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationList"
+
+  /conversations/{id}:
+    get:
+      operationId: getConversation
+      tags: [conversations]
+      summary: Get single conversation with all messages
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Conversation detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationDetail"
+
+  /conversations/{id}/read:
+    post:
+      operationId: markConversationRead
+      tags: [conversations]
+      summary: Mark conversation as read
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /messages/send:
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message on any connected platform
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageSendInput"
+      responses:
+        "200":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageSendResult"
+
+  /xan/chat:
+    post:
+      operationId: chatWithXan
+      tags: [xan]
+      summary: Send a message to Xan AI assistant
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/XanChatInput"
+      responses:
+        "200":
+          description: Xan response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XanChatResponse"
+
+  /xan/draft/{conversationId}:
+    post:
+      operationId: regenerateDraft
+      tags: [xan]
+      summary: Regenerate Xan AI draft reply for a conversation
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: New draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DraftReply"
+
+  /xan/history:
+    get:
+      operationId: getXanHistory
+      tags: [xan]
+      summary: Get Xan chat history
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Chat history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XanHistoryList"
+
+  /search:
+    post:
+      operationId: semanticSearch
+      tags: [search]
+      summary: Semantic search across all conversations
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchInput"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResults"
+
+  /contacts:
+    get:
+      operationId: getContacts
+      tags: [contacts]
+      summary: Get all smart contacts
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Contact list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactList"
+
+  /contacts/{id}:
+    get:
+      operationId: getContact
+      tags: [contacts]
+      summary: Get full contact profile
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Contact profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactProfile"
+
+  /accounts:
+    get:
+      operationId: getConnectedAccounts
+      tags: [accounts]
+      summary: Get all connected platform accounts
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Connected accounts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectedAccountList"
+
+  /accounts/connect:
+    post:
+      operationId: connectAccount
+      tags: [accounts]
+      summary: Initiate connection for a platform
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountConnectInput"
+      responses:
+        "200":
+          description: Connection initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountConnectResult"
+
+  /accounts/{id}/disconnect:
+    delete:
+      operationId: disconnectAccount
+      tags: [accounts]
+      summary: Disconnect a platform account
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Disconnected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /accounts/{id}/sync:
+    post:
+      operationId: triggerSync
+      tags: [accounts]
+      summary: Trigger deep sync for an account
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncInput"
+      responses:
+        "200":
+          description: Sync triggered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResult"
+
+  /notifications/settings:
+    get:
+      operationId: getNotificationSettings
+      tags: [notifications]
+      summary: Get notification preferences
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Notification settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationSettings"
+
+    put:
+      operationId: updateNotificationSettings
+      tags: [notifications]
+      summary: Update notification preferences
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationSettings"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationSettings"
+
+  /billing/checkout:
+    post:
+      operationId: createCheckout
+      tags: [auth]
+      summary: Create Stripe checkout session
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutInput"
+      responses:
+        "200":
+          description: Checkout URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResult"
+
+  /billing/portal:
+    post:
+      operationId: getBillingPortal
+      tags: [auth]
+      summary: Get Stripe billing portal URL
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Portal URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingPortalResult"
+
+  /webhooks/stripe:
+    post:
+      operationId: stripeWebhook
+      tags: [auth]
+      summary: Stripe webhook receiver
+      responses:
+        "200":
+          description: Received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /webhooks/unipile:
+    post:
+      operationId: unipileWebhook
+      tags: [messages]
+      summary: Unipile webhook receiver for incoming messages
+      responses:
+        "200":
+          description: Received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /admin/login:
+    post:
+      operationId: adminLogin
+      tags: [auth]
+      summary: Admin login with env credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginInput"
+      responses:
+        "200":
+          description: Admin token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLoginResult"
+        "401":
+          description: Invalid credentials
+
+  /admin/users:
+    get:
+      operationId: adminGetUsers
+      tags: [auth]
+      summary: Admin — list all users
+      security: [{ adminAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserList"
+
+  /admin/users/{id}/activate:
+    post:
+      operationId: adminActivateUser
+      tags: [auth]
+      summary: Admin — change user status
+      security: [{ adminAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminStatusUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /admin/stats:
+    get:
+      operationId: adminGetStats
+      tags: [auth]
+      summary: Admin — platform statistics
+      security: [{ adminAuth: [] }]
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    adminAuth:
+      type: http
+      scheme: bearer
+
   schemas:
     HealthStatus:
       type: object
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        clerkId:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        status:
+          type: string
+        trialEndsAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required: [id, email, status, createdAt]
+
+    UserStatus:
+      type: object
+      properties:
+        status:
+          type: string
+        trialEndsAt:
+          type: ["string", "null"]
+        trialDaysLeft:
+          type: ["integer", "null"]
+        isActive:
+          type: boolean
+      required: [status, isActive]
+
+    Briefing:
+      type: object
+      properties:
+        greeting:
+          type: string
+        timeOfDay:
+          type: string
+        newMessageCount:
+          type: integer
+        activeConversationCount:
+          type: integer
+        inboxState:
+          type: string
+        xanSummary:
+          type: ["string", "null"]
+        unansweredCount:
+          type: integer
+        topPriorityConversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationSummary"
+      required: [greeting, timeOfDay, newMessageCount, activeConversationCount, inboxState, unansweredCount]
+
+    ConversationSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        platform:
+          type: string
+        contactName:
+          type: string
+        contactAvatarUrl:
+          type: ["string", "null"]
+        contactId:
+          type: ["string", "null"]
+        topicLabel:
+          type: ["string", "null"]
+        headline:
+          type: ["string", "null"]
+        preview:
+          type: ["string", "null"]
+        priority:
+          type: string
+        isRead:
+          type: boolean
+        lastMessageAt:
+          type: string
+        unreadCount:
+          type: integer
+      required: [id, platform, contactName, priority, isRead, lastMessageAt, unreadCount]
+
+    ConversationList:
+      type: object
+      properties:
+        conversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationSummary"
+        total:
+          type: integer
+        hasMore:
+          type: boolean
+      required: [conversations, total, hasMore]
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        platform:
+          type: string
+        direction:
+          type: string
+        bodyText:
+          type: string
+        bodyHtml:
+          type: ["string", "null"]
+        senderName:
+          type: string
+        senderAvatarUrl:
+          type: ["string", "null"]
+        headline:
+          type: ["string", "null"]
+        sentAt:
+          type: string
+        isRead:
+          type: boolean
+      required: [id, conversationId, platform, direction, bodyText, senderName, sentAt, isRead]
+
+    ConversationDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        platform:
+          type: string
+        contactName:
+          type: string
+        contactAvatarUrl:
+          type: ["string", "null"]
+        contactId:
+          type: ["string", "null"]
+        topicLabel:
+          type: ["string", "null"]
+        priority:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        draftReply:
+          type: ["string", "null"]
+        relatedConversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationSummary"
+      required: [id, platform, contactName, priority, messages]
+
+    DraftReply:
+      type: object
+      properties:
+        draft:
+          type: string
+        conversationId:
+          type: string
+      required: [draft, conversationId]
+
+    MessageSendInput:
+      type: object
+      properties:
+        conversationId:
+          type: string
+        platform:
+          type: string
+        body:
+          type: string
+        accountId:
+          type: ["string", "null"]
+      required: [conversationId, platform, body]
+
+    MessageSendResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        messageId:
+          type: ["string", "null"]
+      required: [success]
+
+    XanChatInput:
+      type: object
+      properties:
+        message:
+          type: string
+        conversationId:
+          type: ["string", "null"]
+      required: [message]
+
+    XanChatResponse:
+      type: object
+      properties:
+        response:
+          type: string
+        type:
+          type: string
+        relatedConversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationSummary"
+        draft:
+          type: ["string", "null"]
+      required: [response, type]
+
+    XanMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+      required: [id, role, content, createdAt]
+
+    XanHistoryList:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/XanMessage"
+      required: [messages]
+
+    SearchInput:
+      type: object
+      properties:
+        query:
+          type: string
+        platform:
+          type: ["string", "null"]
+        limit:
+          type: ["integer", "null"]
+      required: [query]
+
+    SearchResult:
+      type: object
+      properties:
+        conversationId:
+          type: string
+        messageId:
+          type: string
+        platform:
+          type: string
+        contactName:
+          type: string
+        snippet:
+          type: string
+        relevanceScore:
+          type: number
+        sentAt:
+          type: string
+      required: [conversationId, messageId, platform, contactName, snippet, relevanceScore, sentAt]
+
+    SearchResults:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResult"
+        query:
+          type: string
+        total:
+          type: integer
+      required: [results, query, total]
+
+    Contact:
+      type: object
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        avatarUrl:
+          type: ["string", "null"]
+        platforms:
+          type: array
+          items:
+            type: string
+        lastInteractionAt:
+          type: ["string", "null"]
+        relationshipScore:
+          type: ["number", "null"]
+        activeConversationCount:
+          type: integer
+      required: [id, displayName, platforms, activeConversationCount]
+
+    ContactList:
+      type: object
+      properties:
+        contacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contact"
+        total:
+          type: integer
+      required: [contacts, total]
+
+    ContactIdentity:
+      type: object
+      properties:
+        platform:
+          type: string
+        externalId:
+          type: string
+        displayName:
+          type: string
+      required: [platform, externalId, displayName]
+
+    ContactProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        avatarUrl:
+          type: ["string", "null"]
+        identities:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContactIdentity"
+        recentConversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationSummary"
+        relationshipScore:
+          type: ["number", "null"]
+        lastInteractionAt:
+          type: ["string", "null"]
+        activeTopics:
+          type: array
+          items:
+            type: string
+      required: [id, displayName, identities, recentConversations, activeTopics]
+
+    ConnectedAccount:
+      type: object
+      properties:
+        id:
+          type: string
+        platform:
+          type: string
+        displayName:
+          type: string
+        externalId:
+          type: ["string", "null"]
+        status:
+          type: string
+        lastSyncAt:
+          type: ["string", "null"]
+        syncProgress:
+          type: ["integer", "null"]
+      required: [id, platform, displayName, status]
+
+    ConnectedAccountList:
+      type: object
+      properties:
+        accounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConnectedAccount"
+      required: [accounts]
+
+    AccountConnectInput:
+      type: object
+      properties:
+        platform:
+          type: string
+        authType:
+          type: string
+      required: [platform, authType]
+
+    AccountConnectResult:
+      type: object
+      properties:
+        connectionId:
+          type: string
+        authUrl:
+          type: ["string", "null"]
+        qrCode:
+          type: ["string", "null"]
+        status:
+          type: string
+      required: [connectionId, status]
+
+    SyncInput:
+      type: object
+      properties:
+        depth:
+          type: string
+      required: [depth]
+
+    SyncResult:
+      type: object
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+      required: [jobId, status]
+
+    NotificationSettings:
+      type: object
+      properties:
+        dailyDigest:
+          type: boolean
+        digestTime:
+          type: string
+        trialReminders:
+          type: boolean
+        priorityAlerts:
+          type: boolean
+      required: [dailyDigest, digestTime, trialReminders, priorityAlerts]
+
+    CheckoutInput:
+      type: object
+      properties:
+        addOnAccounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlatformCount"
+      required: [addOnAccounts]
+
+    PlatformCount:
+      type: object
+      properties:
+        platform:
+          type: string
+        count:
+          type: integer
+      required: [platform, count]
+
+    CheckoutResult:
+      type: object
+      properties:
+        url:
+          type: string
+      required: [url]
+
+    BillingPortalResult:
+      type: object
+      properties:
+        url:
+          type: string
+      required: [url]
+
+    AdminLoginInput:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required: [email, password]
+
+    AdminLoginResult:
+      type: object
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+      required: [token, expiresAt]
+
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        status:
+          type: string
+        connectedAccountCount:
+          type: integer
+        connectedPlatforms:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+        trialEndsAt:
+          type: ["string", "null"]
+        plan:
+          type: ["string", "null"]
+      required: [id, email, status, connectedAccountCount, createdAt]
+
+    AdminUserList:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUser"
+        total:
+          type: integer
+      required: [users, total]
+
+    AdminStatusUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        adminFreeAccess:
+          type: boolean
+      required: [status]
+
+    AdminStats:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        activeUsers:
+          type: integer
+        pendingUsers:
+          type: integer
+        trialUsers:
+          type: integer
+        suspendedUsers:
+          type: integer
+        mrr:
+          type: number
+      required: [totalUsers, activeUsers, pendingUsers, trialUsers, suspendedUsers, mrr]

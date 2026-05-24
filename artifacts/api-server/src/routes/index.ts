@@ -1,8 +1,32 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import authRouter from "./auth";
+import briefingRouter from "./briefing";
+import conversationsRouter from "./conversations";
+import messagesRouter from "./messages";
+import xanRouter from "./xan";
+import searchRouter from "./search";
+import contactsRouter from "./contacts";
+import accountsRouter from "./accounts";
+import notificationsRouter from "./notifications";
+import billingRouter from "./billing";
+import webhooksRouter from "./webhooks";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(authRouter);
+router.use(briefingRouter);
+router.use(conversationsRouter);
+router.use(messagesRouter);
+router.use(xanRouter);
+router.use(searchRouter);
+router.use(contactsRouter);
+router.use(accountsRouter);
+router.use(notificationsRouter);
+router.use(billingRouter);
+router.use(webhooksRouter);
+router.use(adminRouter);
 
 export default router;
