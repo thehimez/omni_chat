@@ -55,13 +55,13 @@ function ThemeToggle() {
 function UserProfile() {
   const { data: user, isLoading } = useGetMe();
 
-  if (isLoading || !user) return null;
+  if (isLoading || !user || !user.email) return null;
 
   return (
     <div className="flex items-center gap-3 px-2 py-3 mt-4 border-t border-border">
       <Avatar className="h-8 w-8">
         <AvatarImage src={user.avatarUrl || ''} />
-        <AvatarFallback>{user.email.charAt(0).toUpperCase()}</AvatarFallback>
+        <AvatarFallback>{(user.email || "?").charAt(0).toUpperCase()}</AvatarFallback>
       </Avatar>
       <div className="hidden md:block flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{user.firstName ? `${user.firstName} ${user.lastName}` : user.email}</p>
