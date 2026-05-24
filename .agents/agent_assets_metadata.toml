@@ -5,4 +5,10 @@ generated = []
 id = "GJNTXfi8UMhSzCP3dwVlo"
 uri = "file://PRD-XandaCross.md"
 type = "text"
-title = "Xanda Cross — Product Requirements Document"
+title = "Xanda Cross PRD — Markdown"
+
+[[outputs]]
+id = "OvBAJHlzF5YKOpBcqfzlo"
+uri = "file://XandaCross-PRD.zip"
+type = "unspecified"
+title = "Xanda Cross PRD — All Documents (ZIP)"

@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Xanda Cross — Product Requirements Document</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #1a1a2e;
+    background: #ffffff;
+    padding: 0;
+  }
+
+  .cover {
+    background: linear-gradient(135deg, #0f1117 0%, #1a1040 50%, #0d1f3c 100%);
+    color: white;
+    padding: 80px 60px;
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(108, 99, 255, 0.15) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  .cover::after {
+    content: '';
+    position: absolute;
+    bottom: -30%;
+    left: 10%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(0, 212, 180, 0.1) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  .cover-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #6C63FF;
+    margin-bottom: 16px;
+  }
+
+  .cover-title {
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+  }
+
+  .cover-subtitle {
+    font-size: 18px;
+    font-weight: 300;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 40px;
+  }
+
+  .cover-meta {
+    display: flex;
+    gap: 40px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .cover-meta span strong {
+    display: block;
+    color: rgba(255,255,255,0.9);
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .xan-badge {
+    display: inline-block;
+    background: linear-gradient(90deg, #6C63FF, #00D4B4);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+  }
+
+  .content {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 60px 40px;
+  }
+
+  .toc {
+    background: #f8f7ff;
+    border-left: 4px solid #6C63FF;
+    border-radius: 0 12px 12px 0;
+    padding: 32px 36px;
+    margin-bottom: 60px;
+  }
+
+  .toc h2 {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #6C63FF;
+    margin-bottom: 20px;
+  }
+
+  .toc ol {
+    columns: 2;
+    column-gap: 40px;
+    list-style: none;
+    counter-reset: toc;
+  }
+
+  .toc li {
+    counter-increment: toc;
+    padding: 4px 0;
+    font-size: 13px;
+    color: #444;
+    break-inside: avoid;
+  }
+
+  .toc li::before {
+    content: counter(toc) ". ";
+    color: #6C63FF;
+    font-weight: 600;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #0f1117;
+    margin-bottom: 16px;
+    margin-top: 60px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #6C63FF;
+  }
+
+  h1 .section-num {
+    color: #6C63FF;
+    margin-right: 8px;
+  }
+
+  h2 {
+    font-size: 17px;
+    font-weight: 600;
+    color: #1a1a2e;
+    margin-top: 36px;
+    margin-bottom: 12px;
+  }
+
+  h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #6C63FF;
+    margin-top: 24px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  p { margin-bottom: 14px; color: #333; }
+
+  ul, ol {
+    margin: 12px 0 16px 20px;
+    color: #333;
+  }
+
+  li { margin-bottom: 6px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 13px;
+  }
+
+  th {
+    background: #0f1117;
+    color: white;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #eee;
+    color: #333;
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) td { background: #fafafa; }
+  tr:hover td { background: #f0eeff; }
+
+  .code-block {
+    background: #0f1117;
+    color: #e0e0e0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    padding: 24px;
+    border-radius: 10px;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+
+  .highlight-box {
+    background: linear-gradient(135deg, #f0eeff, #e8fbf8);
+    border: 1px solid #d4c5ff;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 20px 0;
+  }
+
+  .highlight-box p { margin-bottom: 8px; color: #333; }
+  .highlight-box p:last-child { margin-bottom: 0; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .badge-green { background: #d4edda; color: #155724; }
+  .badge-amber { background: #fff3cd; color: #856404; }
+  .badge-red { background: #f8d7da; color: #721c24; }
+  .badge-purple { background: #e8e3ff; color: #4a3aaa; }
+  .badge-teal { background: #d0f5f0; color: #0a5a50; }
+
+  .feature-card {
+    border: 1px solid #e8e3ff;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 16px 0;
+    position: relative;
+  }
+
+  .feature-card .feature-num {
+    position: absolute;
+    top: -12px;
+    left: 20px;
+    background: #6C63FF;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 20px;
+  }
+
+  .feature-card h2 {
+    margin-top: 8px;
+    margin-bottom: 10px;
+    font-size: 15px;
+  }
+
+  .ai-tag {
+    display: inline-block;
+    background: #00D4B4;
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin: 2px;
+  }
+
+  .platform-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 16px 0;
+  }
+
+  .platform-chip {
+    background: #f8f7ff;
+    border: 1px solid #e0dbff;
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    color: #4a3aaa;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 40px 0;
+  }
+
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .flow-num {
+    background: #6C63FF;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  .metric-card {
+    background: #f8f7ff;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  .metric-card .value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #6C63FF;
+    display: block;
+  }
+
+  .metric-card .label {
+    font-size: 11px;
+    color: #888;
+    margin-top: 4px;
+  }
+
+  .pricing-display {
+    background: #0f1117;
+    color: white;
+    border-radius: 12px;
+    padding: 28px 32px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    margin: 20px 0;
+    line-height: 2;
+  }
+
+  .pricing-display .price-total {
+    color: #6C63FF;
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  .pricing-display .price-divider {
+    border-top: 1px solid #333;
+    margin: 10px 0;
+  }
+
+  .footer {
+    background: #0f1117;
+    color: rgba(255,255,255,0.4);
+    text-align: center;
+    padding: 30px;
+    font-size: 12px;
+    margin-top: 60px;
+  }
+
+  .footer strong {
+    color: rgba(255,255,255,0.8);
+  }
+
+  @media print {
+    body { font-size: 12px; }
+    .cover { min-height: 200px; padding: 50px 40px; }
+    .cover-title { font-size: 32px; }
+    .content { padding: 40px 30px; }
+    h1 { margin-top: 40px; }
+    .platform-grid { grid-template-columns: repeat(4, 1fr); }
+    .metric-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-label">Product Requirements Document</div>
+  <div class="xan-badge">Powered by Xan AI</div>
+  <div class="cover-title">Xanda Cross</div>
+  <div class="cover-subtitle">AI-Powered Unified Inbox — xandacross.com</div>
+  <div class="cover-meta">
+    <span><strong>Version</strong>1.0 MVP</span>
+    <span><strong>Date</strong>May 2026</span>
+    <span><strong>Status</strong>Pre-development</span>
+    <span><strong>AI Assistant</strong>Xan</span>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- TABLE OF CONTENTS -->
+  <div class="toc">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li>Product Overview</li>
+      <li>Problem Statement</li>
+      <li>Core Features</li>
+      <li>Platform Integrations</li>
+      <li>AI Architecture (Xan)</li>
+      <li>User Flows</li>
+      <li>Authentication &amp; Access Control</li>
+      <li>Pricing Model</li>
+      <li>Admin Panel</li>
+      <li>Technical Architecture</li>
+      <li>Pages &amp; Screens</li>
+      <li>MVP Scope</li>
+      <li>Success Metrics</li>
+      <li>Risks &amp; Mitigations</li>
+      <li>Competitive Positioning</li>
+    </ol>
+  </div>
+
+  <!-- SECTION 1 -->
+  <h1><span class="section-num">1.</span> Product Overview</h1>
+
+  <h2>1.1 Vision</h2>
+  <p>Xanda Cross is an AI-powered unified communication platform that consolidates all of a user's messages from every major platform — Gmail, Outlook, WhatsApp, LinkedIn, Instagram, Telegram, and Slack — into a single intelligent inbox. The platform is powered by an AI assistant named <strong>Xan</strong>, who understands conversation context, ranks messages by priority, labels conversations by topic, generates message summaries, drafts replies, and surfaces connections across platforms that the user would otherwise miss.</p>
+  <p>The core insight: professionals split their communication lives across 5–7 apps simultaneously. Context is lost constantly. Xanda Cross solves this not by being another aggregator, but by being the first truly intelligent inbox — where the AI does the heavy lifting so the user only focuses on decisions, not on reading and sorting.</p>
+
+  <h2>1.2 Branding</h2>
+  <table>
+    <tr><th>Element</th><th>Value</th></tr>
+    <tr><td>Product name</td><td>Xanda Cross</td></tr>
+    <tr><td>Domain</td><td>xandacross.com</td></tr>
+    <tr><td>AI assistant</td><td>Xan</td></tr>
+    <tr><td>Auth subdomain</td><td>auth.xandacross.com</td></tr>
+    <tr><td>Xan personality</td><td>Calm, precise, contextually aware. Short confident sentences. Chief of staff, not chatbot.</td></tr>
+    <tr><td>Design language</td><td>Dark theme. Deep navy. Electric indigo (#6C63FF). Teal for AI content (#00D4B4). Premium, minimal.</td></tr>
+  </table>
+
+  <h2>1.3 Target Users</h2>
+  <table>
+    <tr><th>Segment</th><th>Description</th><th>Why They Pay</th></tr>
+    <tr><td><strong>Indian startup founders</strong></td><td>Manage large professional networks across Gmail, WhatsApp, Slack daily</td><td>High message volume; high cost of missed follow-ups</td></tr>
+    <tr><td><strong>Recruiters &amp; talent agencies</strong></td><td>Live across Gmail, LinkedIn, WhatsApp, Instagram simultaneously</td><td>Missing a follow-up costs a placement fee (₹50k–5L)</td></tr>
+    <tr><td><strong>Sales professionals</strong></td><td>Multi-channel outreach; need cross-platform relationship context</td><td>Revenue directly tied to inbox responsiveness</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- SECTION 2 -->
+  <h1><span class="section-num">2.</span> Problem Statement</h1>
+
+  <p>Professionals today manage 5–7 communication apps simultaneously. Every time they switch apps, context is lost. A deal discussed on WhatsApp, followed up on email, and confirmed on LinkedIn exists in three separate silos with no link between them.</p>
+
+  <div class="highlight-box">
+    <p><strong>Existing tools fail in three ways:</strong></p>
+    <p>1. Aggregators without intelligence — show all messages together but don't help you decide what matters</p>
+    <p>2. AI assistants with no real integration — can talk about email but cannot actually read it</p>
+    <p>3. Single-channel tools — Superhuman only does Gmail; nothing covers 7 platforms</p>
+  </div>
+
+  <p>Xanda Cross solves all three simultaneously: <strong>aggregation</strong> (all channels, one place) + <strong>intelligence</strong> (AI that understands what matters) + <strong>context</strong> (cross-platform relationship awareness).</p>
+
+  <hr class="divider">
+
+  <!-- SECTION 3 -->
+  <h1><span class="section-num">3.</span> Core Features</h1>
+
+  <div class="feature-card">
+    <div class="feature-num">Feature 1</div>
+    <h2>Time-Aware Personalised Briefing Screen</h2>
+    <p>The first screen a logged-in user sees. Greets the user by first name. Adapts dynamically based on time of day and actual inbox state.</p>
+    <table>
+      <tr><th>Time Range</th><th>Greeting</th></tr>
+      <tr><td>5:00 AM – 11:59 AM</td><td>"Good morning, [Name]."</td></tr>
+      <tr><td>12:00 PM – 4:59 PM</td><td>"Good afternoon, [Name]."</td></tr>
+      <tr><td>5:00 PM – 8:59 PM</td><td>"Good evening, [Name]."</td></tr>
+      <tr><td>9:00 PM – 4:59 AM</td><td>"Good night, [Name]."</td></tr>
+    </table>
+    <table>
+      <tr><th>Inbox State</th><th>Message Displayed</th></tr>
+      <tr><td>New messages exist</td><td>"You've got [N] new and [M] active conversations." + briefing button</td></tr>
+      <tr><td>Empty inbox</td><td>"You're all caught up. Nothing needs your attention right now."</td></tr>
+      <tr><td>Active, no new</td><td>"No new messages, but you have [N] active conversations in progress."</td></tr>
+    </table>
+    <p><strong>Persistent element:</strong> Search bar always visible at bottom. Placeholder: <em>"Ask Xan anything or search across all conversations..."</em></p>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-num">Feature 2</div>
+    <h2>Unified Inbox</h2>
+    <p>A single feed showing all messages from all connected platforms, ranked by AI priority — not by time received.</p>
+    <p><strong>Each conversation row displays:</strong></p>
+    <ul>
+      <li>Contact profile photo (circular avatar)</li>
+      <li>Contact full name in bold</li>
+      <li>Platform icon (16px, official brand colour) after the name</li>
+      <li>AI topic label — <span class="ai-tag">Engineering Hiring</span> <span class="ai-tag">Term Sheet</span> <span class="ai-tag">Payment Follow-up</span> — pill-shaped, teal, auto-assigned by Xan</li>
+      <li>Message preview text (single line, muted, truncated)</li>
+      <li>Timestamp + unread indicator</li>
+      <li>Priority left-border: red (High) / amber (Medium) / grey (Low)</li>
+    </ul>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-num">Feature 3</div>
+    <h2>AI Priority Ranking</h2>
+    <p>Every incoming message is scored by Xan and assigned: <span class="badge badge-red">High</span> <span class="badge badge-amber">Medium</span> <span class="badge badge-green">Low</span></p>
+    <p><strong>Xan scores based on:</strong> Sender relationship strength · Message keywords (urgent, invoice, contract, deadline) · Response required (NLP detection) · Thread age · Sender importance · Time sensitivity</p>
+    <p>Priority is recomputed every time a new message arrives in a thread.</p>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-num">Feature 4</div>
+    <h2>AI Message Headline</h2>
+    <p>Every message gets a one-line AI-generated summary by Xan. Appears in the inbox row. User understands the message without opening it.</p>
+    <p><em>Examples: "Rohan asking for a call today re: term sheet" · "Sara confirmed the deal — needs invoice by Friday" · "Candidate accepted offer — needs joining date"</em></p>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-num">Feature 5</div>
+    <h2>AI Auto-Drafted Reply</h2>
+    <p>Every message gets a pre-drafted reply written by Xan, ready when the user opens the conversation. User edits if needed and sends. <strong>Nothing is ever sent automatically.</strong></p>
+    <p>Xan drafts based on: full conversation history · user's writing style from past sent messages · context and tone of the relationship</p>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-num">Feature 6</div>
+    <h2>Auto-Labelled Topics</h2>
+    <p>Xan reads full conversation context and automatically assigns a 2–4 word topic label to every conversation. No manual tagging. Labels appear as teal pills in the inbox.</p>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-num">Feature 7</div>
+    <h2>Universal Semantic Search</h2>
+    <p>Search across all conversations from all platforms using natural language. Powered by vector embeddings in PostgreSQL via pgvector. Finds messages by meaning, not just keywords.</p>
+    <p><em>Examples: "emails about Series A from Sequoia" · "everything Rohan said about the launch date" · "WhatsApp messages about pricing in the last 30 days"</em></p>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-num">Feature 8</div>
+    <h2>Contextual Cross-Platform Linking</h2>
+    <p>Xan proactively identifies when messages across different platforms are about the same topic or deal and surfaces them together inside the conversation view.</p>
+    <p><em>Example: A contract sent on WhatsApp on Monday + a Gmail email Tuesday requesting that contract → Xan surfaces both together automatically.</em></p>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-num">Feature 9</div>
+    <h2>Smart Contact Profiles</h2>
+    <p>Every contact has a unified profile page showing: cross-platform conversation history · active topics · open goals · relationship timeline · last interaction date and channel · Xan-computed relationship health score.</p>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-num">Feature 10</div>
+    <h2>@Xan Mentions</h2>
+    <p>Users can type <strong>@Xan</strong> anywhere in the platform to ask questions, request summaries, search conversations, or get briefings.</p>
+    <p><em>Examples: "Summarise my conversation with Rohan" · "What's the status of the Acme deal?" · "Who haven't I replied to in 3 days?" · "Give me a briefing on everything I missed today"</em></p>
+    <p>Xan responds in short, structured format — lists and direct answers, never long paragraphs.</p>
+  </div>
+
+  <hr class="divider">
+
+  <!-- SECTION 4 -->
+  <h1><span class="section-num">4.</span> Platform Integrations</h1>
+
+  <h2>4.1 Integration Architecture</h2>
+  <p>All platforms except Slack are connected via <strong>Unipile</strong> — a single unified messaging API. Unipile is accessed via their Node.js SDK and white-labelled under:</p>
+  <div class="highlight-box">
+    <p><strong>Auth subdomain:</strong> auth.xandacross.com — Users see only Xanda Cross branding. Unipile branding is never visible.</p>
+  </div>
+  <p><strong>Slack</strong> is integrated directly via the official Slack Web API (@slack/web-api) — free, no per-account cost.</p>
+
+  <h2>4.2 Supported Platforms</h2>
+  <table>
+    <tr><th>Platform</th><th>Integration</th><th>Access Level</th></tr>
+    <tr><td><strong>Gmail</strong></td><td>Unipile (Google API)</td><td>Full inbox — read, send, sync</td></tr>
+    <tr><td><strong>Outlook</strong></td><td>Unipile (Microsoft Graph)</td><td>Full inbox — read, send, sync</td></tr>
+    <tr><td><strong>WhatsApp Personal</strong></td><td>Unipile (QR session auth)</td><td>Full personal inbox — read, reply</td></tr>
+    <tr><td><strong>WhatsApp Business</strong></td><td>Unipile (Cloud API)</td><td>Inbound + reply within 24h window</td></tr>
+    <tr><td><strong>LinkedIn</strong></td><td>Unipile (session-based)</td><td>DM inbox — read, reply</td></tr>
+    <tr><td><strong>Instagram</strong></td><td>Unipile (Meta API)</td><td>Business DMs — read, reply</td></tr>
+    <tr><td><strong>Telegram</strong></td><td>Unipile (official MTProto)</td><td>Full inbox — read, reply</td></tr>
+    <tr><td><strong>Slack</strong></td><td>Direct Slack Web API</td><td>DMs + channel messages</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- SECTION 5 -->
+  <h1><span class="section-num">5.</span> AI Architecture — Xan</h1>
+
+  <h2>5.1 Xan's Four Automatic Jobs (per message)</h2>
+  <p>All four run as background BullMQ jobs immediately after a message is stored. Results pushed to browser via WebSocket within 2–5 seconds.</p>
+  <table>
+    <tr><th>Job</th><th>Model</th><th>Output</th></tr>
+    <tr><td>generate-headline</td><td>GPT-4o-mini</td><td>One-line message summary</td></tr>
+    <tr><td>score-priority</td><td>GPT-4o-mini</td><td>High / Medium / Low + reasoning</td></tr>
+    <tr><td>assign-topic-label</td><td>GPT-4o-mini</td><td>2–4 word topic label</td></tr>
+    <tr><td>draft-reply</td><td>GPT-4o</td><td>Full draft reply in user's tone</td></tr>
+  </table>
+
+  <h2>5.2 AI Models</h2>
+  <table>
+    <tr><th>Purpose</th><th>Model</th><th>Why</th></tr>
+    <tr><td>Headline, priority, label</td><td>GPT-4o-mini</td><td>Fast, cheap, high quality for short outputs</td></tr>
+    <tr><td>Reply drafting</td><td>GPT-4o</td><td>Higher quality writing; worth the cost</td></tr>
+    <tr><td>Structured output</td><td>Zod + function calling</td><td>Never parse free-form LLM text</td></tr>
+    <tr><td>Embeddings</td><td>text-embedding-3-small</td><td>$0.02/1M tokens; 1536 dimensions</td></tr>
+    <tr><td>Semantic search</td><td>pgvector (PostgreSQL)</td><td>No extra DB needed for MVP</td></tr>
+    <tr><td>Long context (Phase 2)</td><td>Claude 3.5</td><td>200k context for full inbox analysis</td></tr>
+  </table>
+
+  <h2>5.3 Message Processing Pipeline</h2>
+  <div class="code-block">
+Webhook arrives (Unipile or Slack)
+       ↓
+API server receives → validates signature
+       ↓
+Message normalised to CanonicalMessage schema
+       ↓
+Stored in PostgreSQL
+       ↓
+Contact resolved / created
+       ↓
+Four BullMQ jobs dispatched in parallel:
+  ├── generate-headline    → GPT-4o-mini → saved to DB
+  ├── score-priority       → GPT-4o-mini → saved to DB
+  ├── assign-topic-label   → GPT-4o-mini → saved to DB
+  └── draft-reply          → GPT-4o      → saved to DB
+       ↓
+Embedding job: text-embedding-3-small → pgvector
+       ↓
+Socket.io pushes update to browser
+       ↓
+Inbox updates live with all AI outputs
+  </div>
+
+  <hr class="divider">
+
+  <!-- SECTION 6 -->
+  <h1><span class="section-num">6.</span> User Flows</h1>
+
+  <h2>6.1 Onboarding Flow</h2>
+  <div class="flow-step"><div class="flow-num">1</div><div>User lands on xandacross.com</div></div>
+  <div class="flow-step"><div class="flow-num">2</div><div>Signs up via Clerk (Google OAuth or email + password)</div></div>
+  <div class="flow-step"><div class="flow-num">3</div><div>Account created — status: <span class="badge badge-amber">PENDING</span></div></div>
+  <div class="flow-step"><div class="flow-num">4</div><div>User sees Pending Screen: "You're on the list."</div></div>
+  <div class="flow-step"><div class="flow-num">5</div><div>Activation: Admin manually enables <em>or</em> user pays via Stripe (instant auto-activation)</div></div>
+  <div class="flow-step"><div class="flow-num">6</div><div>User logs in → Connect Accounts screen (auth.xandacross.com)</div></div>
+  <div class="flow-step"><div class="flow-num">7</div><div>Initial sync begins → progress shown live via WebSocket</div></div>
+  <div class="flow-step"><div class="flow-num">8</div><div>Sync complete → Briefing Screen with first messages ready</div></div>
+
+  <h2>6.2 Daily Usage Flow</h2>
+  <div class="flow-step"><div class="flow-num">1</div><div>User opens app → Briefing Screen with time-aware greeting + message counts</div></div>
+  <div class="flow-step"><div class="flow-num">2</div><div>Clicks "Open today's briefing" → Unified Inbox (priority-ranked)</div></div>
+  <div class="flow-step"><div class="flow-num">3</div><div>Scans topic labels and headlines to decide what to open</div></div>
+  <div class="flow-step"><div class="flow-num">4</div><div>Opens high-priority message → sees full thread + related cross-platform messages</div></div>
+  <div class="flow-step"><div class="flow-num">5</div><div>Xan's draft reply already visible → user edits → sends</div></div>
+  <div class="flow-step"><div class="flow-num">6</div><div>Repeat for next priority message</div></div>
+
+  <hr class="divider">
+
+  <!-- SECTION 7 -->
+  <h1><span class="section-num">7.</span> Authentication &amp; Access Control</h1>
+
+  <h2>7.1 User Status States</h2>
+  <table>
+    <tr><th>Status</th><th>Description</th><th>Access</th></tr>
+    <tr><td><span class="badge badge-amber">pending</span></td><td>Default on signup</td><td>Login allowed; platform locked. Sees Pending Screen.</td></tr>
+    <tr><td><span class="badge badge-green">active</span></td><td>Enabled by admin or Stripe payment</td><td>Full platform access</td></tr>
+    <tr><td><span class="badge badge-red">disabled</span></td><td>Manually disabled by admin</td><td>Login blocked</td></tr>
+  </table>
+
+  <h2>7.2 Activation Methods</h2>
+  <p><strong>Manual:</strong> Admin panel → find user → flip toggle to active. Immediate, no email required.</p>
+  <p><strong>Automatic (Stripe):</strong> User completes payment → Stripe fires <code>checkout.session.completed</code> → backend matches Stripe customer to Clerk user → sets status to active via Clerk publicMetadata → instant full access.</p>
+
+  <hr class="divider">
+
+  <!-- SECTION 8 -->
+  <h1><span class="section-num">8.</span> Pricing Model</h1>
+
+  <h2>8.1 Structure</h2>
+  <p>No fixed tiers. Users build their own plan by selecting exactly what they need.</p>
+
+  <table>
+    <tr><th>Component</th><th>Price</th><th>Includes</th></tr>
+    <tr><td><strong>Base Plan</strong> (mandatory)</td><td><strong>$10/month</strong></td><td>All AI features + unlimited Slack accounts</td></tr>
+    <tr><td><strong>Add-on accounts</strong></td><td><strong>$7/account/month</strong></td><td>Gmail, Outlook, WhatsApp, LinkedIn, Instagram, Telegram</td></tr>
+  </table>
+
+  <h2>8.2 Live Pricing Calculator (UI)</h2>
+  <div class="pricing-display">
+    [ AI Features + Slack Unlimited ]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$10/month
+    <div class="price-divider"></div>
+    Add accounts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$7 per account<br><br>
+    &nbsp;&nbsp;Gmail&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ − ]&nbsp;&nbsp;0&nbsp;&nbsp;[ + ]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$0<br>
+    &nbsp;&nbsp;Outlook&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ − ]&nbsp;&nbsp;0&nbsp;&nbsp;[ + ]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$0<br>
+    &nbsp;&nbsp;WhatsApp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ − ]&nbsp;&nbsp;1&nbsp;&nbsp;[ + ]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$7<br>
+    &nbsp;&nbsp;LinkedIn&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ − ]&nbsp;&nbsp;1&nbsp;&nbsp;[ + ]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$7<br>
+    &nbsp;&nbsp;Instagram&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ − ]&nbsp;&nbsp;0&nbsp;&nbsp;[ + ]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$0<br>
+    &nbsp;&nbsp;Telegram&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ − ]&nbsp;&nbsp;0&nbsp;&nbsp;[ + ]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$0
+    <div class="price-divider"></div>
+    Total&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="price-total">$24/month</span><br><br>
+    [ Start my plan → ]
+  </div>
+
+  <h2>8.3 Cost Coverage</h2>
+  <table>
+    <tr><th>Item</th><th>Cost</th></tr>
+    <tr><td>Unipile cost per connected account</td><td>~$5.50/month</td></tr>
+    <tr><td>Xanda Cross charge per connected account</td><td>$7/month</td></tr>
+    <tr><td>Margin per account</td><td>~$1.50 (27%)</td></tr>
+    <tr><td>Slack accounts</td><td>$0 cost (direct API) — included in base free</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- SECTION 9 -->
+  <h1><span class="section-num">9.</span> Admin Panel</h1>
+  <table>
+    <tr><th>Feature</th><th>Details</th></tr>
+    <tr><td>Dashboard stats</td><td>Total users · Active · Pending · MRR · Connected accounts by platform</td></tr>
+    <tr><td>User table columns</td><td>Name · Email · Signed Up · Status · Plan · Connected Accounts · Actions</td></tr>
+    <tr><td>Status badges</td><td>Active (green) / Pending (amber) / Disabled (red)</td></tr>
+    <tr><td>Actions per user</td><td>Enable/Disable toggle · View account details</td></tr>
+    <tr><td>Search &amp; filter</td><td>Filter by status · Search by name or email</td></tr>
+    <tr><td>Access control</td><td>admin: true in Clerk publicMetadata only</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- SECTION 10 -->
+  <h1><span class="section-num">10.</span> Technical Architecture</h1>
+
+  <h2>10.1 Tech Stack</h2>
+  <table>
+    <tr><th>Layer</th><th>Technology</th></tr>
+    <tr><td>Frontend framework</td><td>React + Vite</td></tr>
+    <tr><td>Routing</td><td>TanStack Router (type-safe)</td></tr>
+    <tr><td>Server state</td><td>TanStack Query</td></tr>
+    <tr><td>Styling</td><td>Tailwind CSS + Radix UI</td></tr>
+    <tr><td>Real-time</td><td>Socket.io (WebSocket push)</td></tr>
+    <tr><td>Backend</td><td>Node.js + Express 5 + TypeScript</td></tr>
+    <tr><td>ORM</td><td>Drizzle ORM</td></tr>
+    <tr><td>Database</td><td>PostgreSQL + pgvector extension</td></tr>
+    <tr><td>Queue</td><td>BullMQ + Redis</td></tr>
+    <tr><td>Auth</td><td>Clerk</td></tr>
+    <tr><td>Payments</td><td>Stripe</td></tr>
+    <tr><td>Messaging API</td><td>Unipile Node.js SDK (all platforms except Slack)</td></tr>
+    <tr><td>Slack</td><td>@slack/web-api (direct, free)</td></tr>
+    <tr><td>AI</td><td>OpenAI API (GPT-4o + GPT-4o-mini + text-embedding-3-small)</td></tr>
+    <tr><td>Hosting (MVP)</td><td>Railway</td></tr>
+    <tr><td>Hosting (scale)</td><td>AWS Mumbai (ap-south-1)</td></tr>
+    <tr><td>Error tracking</td><td>Sentry</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- SECTION 11 -->
+  <h1><span class="section-num">11.</span> Pages &amp; Screens</h1>
+  <table>
+    <tr><th>Screen</th><th>Description</th></tr>
+    <tr><td>Landing Page</td><td>Marketing — hero, features, platform logos, pricing teaser</td></tr>
+    <tr><td>Sign Up / Login</td><td>Clerk auth — Google OAuth + email/password</td></tr>
+    <tr><td>Pending Screen</td><td>Shown to users awaiting activation</td></tr>
+    <tr><td>Briefing Screen</td><td>Time-aware home with greeting, counts, search bar</td></tr>
+    <tr><td>Unified Inbox</td><td>All messages ranked by priority with labels, headlines, platform icons</td></tr>
+    <tr><td>Conversation View</td><td>Full thread + cross-platform links + AI draft reply</td></tr>
+    <tr><td>Smart Contact Profile</td><td>Full cross-platform history per contact</td></tr>
+    <tr><td>Pricing Page</td><td>Live plan calculator — base + add-on accounts</td></tr>
+    <tr><td>Settings — Accounts</td><td>Connect/disconnect platforms, sync status</td></tr>
+    <tr><td>Settings — Billing</td><td>Current plan, Stripe billing portal</td></tr>
+    <tr><td>Admin Panel</td><td>User management, activation controls, stats</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- SECTION 12 -->
+  <h1><span class="section-num">12.</span> MVP Scope</h1>
+
+  <h2>Build in 30-Day MVP</h2>
+  <div class="platform-grid">
+    <div class="platform-chip">✅ Clerk Auth</div>
+    <div class="platform-chip">✅ Stripe Payments</div>
+    <div class="platform-chip">✅ Unipile Integration</div>
+    <div class="platform-chip">✅ Slack Direct API</div>
+    <div class="platform-chip">✅ Message Normalisation</div>
+    <div class="platform-chip">✅ Briefing Screen</div>
+    <div class="platform-chip">✅ Unified Inbox</div>
+    <div class="platform-chip">✅ AI Pipeline (4 jobs)</div>
+    <div class="platform-chip">✅ Semantic Search</div>
+    <div class="platform-chip">✅ @Xan Search</div>
+    <div class="platform-chip">✅ Contact Profiles</div>
+    <div class="platform-chip">✅ Admin Panel</div>
+    <div class="platform-chip">✅ Pricing Calculator</div>
+    <div class="platform-chip">✅ Stripe Checkout</div>
+  </div>
+
+  <h2>Defer to Phase 2</h2>
+  <ul>
+    <li>Contextual cross-platform message linking (full Xan context engine)</li>
+    <li>Full @Xan mention UI inside conversation threads</li>
+    <li>Mobile app (React Native via Expo)</li>
+    <li>Razorpay (INR payments)</li>
+    <li>LinkedIn Recruiter InMail integration</li>
+    <li>Relationship health scoring dashboard</li>
+    <li>Enterprise SSO (Okta/Azure AD)</li>
+    <li>Team/shared inbox (multi-seat plans)</li>
+    <li>Chrome browser extension</li>
+    <li>CRM integrations (HubSpot, Salesforce)</li>
+  </ul>
+
+  <hr class="divider">
+
+  <!-- SECTION 13 -->
+  <h1><span class="section-num">13.</span> Success Metrics</h1>
+
+  <div class="metric-grid">
+    <div class="metric-card"><span class="value">50</span><div class="label">Beta users — Month 1</div></div>
+    <div class="metric-card"><span class="value">30%</span><div class="label">D30 retention target</div></div>
+    <div class="metric-card"><span class="value">3+</span><div class="label">Avg platforms per user</div></div>
+  </div>
+
+  <table>
+    <tr><th>Milestone</th><th>Target</th></tr>
+    <tr><td>First paying user</td><td>Week 3 of beta</td></tr>
+    <tr><td>100 paying users</td><td>Month 3</td></tr>
+    <tr><td>$2,500 MRR</td><td>Month 4</td></tr>
+    <tr><td>500 paying users</td><td>Month 6</td></tr>
+    <tr><td>$10,000 MRR</td><td>Month 8</td></tr>
+    <tr><td>2,000 paying users</td><td>Month 12</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- SECTION 14 -->
+  <h1><span class="section-num">14.</span> Risks &amp; Mitigations</h1>
+  <table>
+    <tr><th>Risk</th><th>Likelihood</th><th>Mitigation</th></tr>
+    <tr><td>Unipile API instability</td><td>Medium</td><td>Monitor SLA; fallback to direct Gmail/Outlook API for email</td></tr>
+    <tr><td>WhatsApp session bans</td><td>Medium</td><td>Unipile handles; educate users on session hygiene</td></tr>
+    <tr><td>Google OAuth verification delay</td><td>Medium</td><td>Launch beta with 100 whitelisted test users during review period</td></tr>
+    <tr><td>AI cost overrun</td><td>Medium</td><td>Daily caps per plan; GPT-4o-mini for all except reply drafting</td></tr>
+    <tr><td>Low D30 retention</td><td>High</td><td>Daily email digest; morning briefing push notification; habit loop design</td></tr>
+    <tr><td>Stripe + Clerk webhook failure</td><td>Low</td><td>Idempotency keys; webhook retry logic; manual override in admin</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- SECTION 15 -->
+  <h1><span class="section-num">15.</span> Competitive Positioning</h1>
+  <table>
+    <tr><th>Product</th><th>What They Do</th><th>Xanda Cross Advantage</th></tr>
+    <tr><td>Kinso AI</td><td>AI relationship OS, contacts focus</td><td>WhatsApp + LinkedIn DM sync; Indian market focus; Xan AI personality</td></tr>
+    <tr><td>Superhuman</td><td>AI email client (Gmail/Outlook only)</td><td>7 platforms, not just email; $10 vs $30/month</td></tr>
+    <tr><td>Front</td><td>Team inbox, customer support</td><td>Personal/individual focused; no team complexity</td></tr>
+    <tr><td>ChatGPT</td><td>General AI</td><td>Actually integrated with real mailboxes; Xan knows your conversations</td></tr>
+  </table>
+
+  <div class="highlight-box">
+    <p><strong>Unfair advantages for India:</strong></p>
+    <p>· WhatsApp personal inbox sync — nobody else offers this legitimately</p>
+    <p>· Priced accessibly ($10 base) vs. Superhuman ($30, Gmail only)</p>
+    <p>· Telegram-first — massive in Indian startup/tech community</p>
+    <p>· WhatsApp + Gmail cross-linking — solves the exact split-communication problem every Indian professional faces daily</p>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <strong>Xanda Cross — Product Requirements Document v1.0</strong><br>
+  xandacross.com · Powered by Xan AI · Confidential — May 2026
+</div>
+
+</body>
+</html>
