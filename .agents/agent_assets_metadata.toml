@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "GJNTXfi8UMhSzCP3dwVlo"
+uri = "file://PRD-XandaCross.md"
+type = "text"
+title = "Xanda Cross — Product Requirements Document"
