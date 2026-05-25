@@ -342,7 +342,7 @@ export const ConnectAccountBody = zod.object({
 })
 
 export const ConnectAccountResponse = zod.object({
-  "connectionId": zod.string(),
+  "connectionId": zod.string().nullish(),
   "authUrl": zod.string().nullish(),
   "qrCode": zod.string().nullish(),
   "status": zod.string()

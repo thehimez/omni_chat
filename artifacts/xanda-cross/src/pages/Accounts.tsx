@@ -26,15 +26,27 @@ export default function Accounts() {
   const { toast } = useToast();
 
   const handleConnect = (platform: string) => {
+    // Open the popup synchronously inside the click handler — browsers block
+    // window.open() calls that happen inside async callbacks (onSuccess etc.)
+    const popup = window.open('', '_blank', 'width=620,height=800,scrollbars=yes,resizable=yes');
+    if (popup) {
+      popup.document.write('<html><body style="background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p>Connecting to ' + platform + '…</p></body></html>');
+    }
+
     connectMutation.mutate({
       data: { platform, authType: 'oauth' }
     }, {
       onSuccess: (result) => {
-        if (result.authUrl) {
-          window.open(result.authUrl, '_blank', 'width=600,height=800');
-        } else {
-          toast({ title: "Connecting account...", description: "Please follow the instructions." });
+        if (result.authUrl && popup && !popup.closed) {
+          popup.location.href = result.authUrl;
+        } else if (!result.authUrl) {
+          popup?.close();
+          toast({ title: "Connecting account…", description: "Please follow the instructions." });
         }
+      },
+      onError: () => {
+        popup?.close();
+        toast({ title: "Connection failed", description: "Could not start the auth flow. Please try again.", variant: "destructive" });
       }
     });
   };

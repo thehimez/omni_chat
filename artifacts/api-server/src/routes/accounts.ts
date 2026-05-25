@@ -113,7 +113,7 @@ router.post("/accounts/connect", requireAuth, async (req: Request, res: Response
     }
 
     const data = await resp.json() as { url?: string; object?: string };
-    res.json(ConnectAccountResponse.parse({ authUrl: data.url ?? null, accountId: null }));
+    res.json(ConnectAccountResponse.parse({ authUrl: data.url ?? null, connectionId: null, status: "pending" }));
   } catch (err) {
     req.log.error({ err }, "Account connect error");
     res.status(500).json({ error: "Internal error" });

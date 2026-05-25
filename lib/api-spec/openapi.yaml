@@ -971,14 +971,14 @@ components:
       type: object
       properties:
         connectionId:
-          type: string
+          type: ["string", "null"]
         authUrl:
           type: ["string", "null"]
         qrCode:
           type: ["string", "null"]
         status:
           type: string
-      required: [connectionId, status]
+      required: [status]
 
     SyncInput:
       type: object

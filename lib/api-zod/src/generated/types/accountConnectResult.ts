@@ -7,7 +7,8 @@
  */
 
 export interface AccountConnectResult {
-  connectionId: string;
+  /** @nullable */
+  connectionId?: string | null;
   /** @nullable */
   authUrl?: string | null;
   /** @nullable */
