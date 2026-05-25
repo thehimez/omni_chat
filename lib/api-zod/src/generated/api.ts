@@ -338,7 +338,8 @@ export const GetConnectedAccountsResponse = zod.object({
  */
 export const ConnectAccountBody = zod.object({
   "platform": zod.string(),
-  "authType": zod.string()
+  "authType": zod.string(),
+  "redirectBase": zod.string().optional()
 })
 
 export const ConnectAccountResponse = zod.object({

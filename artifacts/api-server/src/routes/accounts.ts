@@ -55,7 +55,14 @@ router.post("/accounts/connect", requireAuth, async (req: Request, res: Response
     return;
   }
 
-  const { platform } = parsed.data;
+  const { platform, redirectBase } = parsed.data;
+
+  // Determine base URL for redirects — prefer what the frontend sent (its own origin),
+  // then APP_URL env var, then REPLIT_DEV_DOMAIN, then fallback.
+  const appUrl =
+    redirectBase ??
+    process.env.APP_URL ??
+    (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "https://xandacross.com");
 
   if (platform === "slack") {
     const slackClientId = process.env.SLACK_CLIENT_ID;
@@ -63,9 +70,9 @@ router.post("/accounts/connect", requireAuth, async (req: Request, res: Response
       res.status(503).json({ error: "Slack integration not configured" });
       return;
     }
-    const redirectUri = `${process.env.APP_URL ?? "https://xandacross.com"}/api/accounts/slack/callback`;
+    const redirectUri = `${appUrl}/api/accounts/slack/callback`;
     const authUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=channels:read,chat:write,im:history,users:read&redirect_uri=${encodeURIComponent(redirectUri)}`;
-    res.json(ConnectAccountResponse.parse({ authUrl, accountId: null }));
+    res.json(ConnectAccountResponse.parse({ authUrl, connectionId: null, status: "pending" }));
     return;
   }
 
@@ -81,8 +88,6 @@ router.post("/accounts/connect", requireAuth, async (req: Request, res: Response
     res.status(400).json({ error: `Unsupported platform: ${platform}` });
     return;
   }
-
-  const appUrl = process.env.APP_URL ?? "https://xandacross.com";
 
   const expiresOn = new Date(Date.now() + 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, ".000Z");
 
@@ -100,7 +105,7 @@ router.post("/accounts/connect", requireAuth, async (req: Request, res: Response
         expiresOn,
         api_url: `https://${unipileHost}`,
         name: user.id,
-        success_redirect_url: `${appUrl}/accounts?connected=${platform}`,
+        success_redirect_url: `${appUrl}/accounts?connected=${platform}&account_id={account_id}`,
         failure_redirect_url: `${appUrl}/accounts?error=true`,
       }),
     });
@@ -116,6 +121,53 @@ router.post("/accounts/connect", requireAuth, async (req: Request, res: Response
     res.json(ConnectAccountResponse.parse({ authUrl: data.url ?? null, connectionId: null, status: "pending" }));
   } catch (err) {
     req.log.error({ err }, "Account connect error");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// Called by the frontend after Unipile redirects back with ?account_id=
+// Upserts the account row so the user sees it immediately (webhook may lag)
+router.post("/accounts/confirm", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const user = (req as any).user;
+  const { platform, unipileAccountId } = req.body as { platform?: string; unipileAccountId?: string };
+
+  if (!platform || !unipileAccountId) {
+    res.status(400).json({ error: "platform and unipileAccountId are required" });
+    return;
+  }
+
+  try {
+    const existing = await db
+      .select()
+      .from(connectedAccountsTable)
+      .where(eq(connectedAccountsTable.unipileAccountId, unipileAccountId))
+      .limit(1);
+
+    if (existing[0]) {
+      await db
+        .update(connectedAccountsTable)
+        .set({ status: "connected", lastSyncAt: new Date() })
+        .where(eq(connectedAccountsTable.id, existing[0].id));
+    } else {
+      const PROVIDER_TO_LABEL: Record<string, string> = {
+        gmail: "Personal Gmail", outlook: "Work Outlook", whatsapp: "Personal WhatsApp",
+        linkedin: "LinkedIn", instagram: "Instagram", telegram: "Telegram", slack: "Slack",
+      };
+      await db.insert(connectedAccountsTable).values({
+        id: `acc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        userId: user.id,
+        platform,
+        accountLabel: PROVIDER_TO_LABEL[platform] ?? platform,
+        unipileAccountId,
+        status: "connected",
+        lastSyncAt: new Date(),
+        messageCount: 0,
+      });
+    }
+
+    res.json({ status: "ok" });
+  } catch (err) {
+    req.log.error({ err }, "Account confirm error");
     res.status(500).json({ error: "Internal error" });
   }
 });

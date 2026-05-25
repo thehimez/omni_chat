@@ -136,6 +136,33 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
             ...(isAccountConnected ? { lastSyncAt: new Date() } : {}),
           })
           .where(eq(connectedAccountsTable.id, accounts[0].id));
+      } else if (event === "account_creation_success") {
+        // First-time connection: insert a new row
+        // `name` field in Unipile payload carries the userId we passed during hosted auth
+        const userId = (payload as any).name ?? (payload as any).data?.name ?? null;
+        const platformFromProvider = provider
+          ? Object.entries({
+              GOOGLE: "gmail", OUTLOOK: "outlook", WHATSAPP: "whatsapp",
+              LINKEDIN: "linkedin", INSTAGRAM: "instagram", TELEGRAM: "telegram",
+              MESSENGER: "messenger", TWITTER: "twitter",
+            }).find(([k]) => k === provider)?.[1] ?? provider.toLowerCase()
+          : "unknown";
+
+        if (userId) {
+          await db.insert(connectedAccountsTable).values({
+            id: `acc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            userId,
+            platform: platformFromProvider,
+            accountLabel: platformFromProvider.charAt(0).toUpperCase() + platformFromProvider.slice(1),
+            unipileAccountId: accountId,
+            status: "connected",
+            lastSyncAt: new Date(),
+            messageCount: 0,
+          }).onConflictDoNothing();
+          logger.info({ userId, platform: platformFromProvider, accountId }, "New account registered via webhook");
+        } else {
+          logger.warn({ accountId, provider }, "account_creation_success webhook missing userId (name field)");
+        }
       }
     }
 

@@ -9,4 +9,5 @@
 export interface AccountConnectInput {
   platform: string;
   authType: string;
+  redirectBase?: string;
 }
