@@ -11,33 +11,34 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth } from "../middleware/auth";
 import { logger } from "../lib/logger";
+import OpenAI from "openai";
 
 const router: IRouter = Router();
 
-async function callOpenAI(systemPrompt: string, userMessage: string): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return "AI assistant is not configured. Please add your OpenAI API key.";
+function getOpenAIClient(): OpenAI {
+  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY ?? "no-key";
+  return new OpenAI({ baseURL, apiKey });
+}
 
-  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-      max_tokens: 1000,
-    }),
-  });
-
-  if (!resp.ok) {
-    logger.error({ status: resp.status }, "OpenAI API error");
+async function callOpenAI(systemPrompt: string, userMessage: string, conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = []): Promise<string> {
+  try {
+    const openai = getOpenAIClient();
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: "system", content: systemPrompt },
+      ...conversationHistory,
+      { role: "user", content: userMessage },
+    ];
+    const resp = await openai.chat.completions.create({
+      model: "gpt-5-mini",
+      max_completion_tokens: 1000,
+      messages,
+    });
+    return resp.choices[0]?.message?.content ?? "No response generated.";
+  } catch (err) {
+    logger.error({ err }, "OpenAI API error");
     return "I encountered an error while processing your request. Please try again.";
   }
-
-  const data = await resp.json() as { choices: Array<{ message: { content: string } }> };
-  return data.choices[0]?.message?.content ?? "No response generated.";
 }
 
 router.post("/xan/chat", requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -57,13 +58,18 @@ router.post("/xan/chat", requireAuth, async (req: Request, res: Response): Promi
     .orderBy(desc(xanMessagesTable.createdAt))
     .limit(10);
 
+  const conversationHistory = history.reverse().map((m) => ({
+    role: m.role as "user" | "assistant",
+    content: m.content,
+  }));
+
   const systemPrompt = `You are Xan, an AI assistant built into the Xanda Cross unified inbox platform. You help users manage their communications across Gmail, Outlook, WhatsApp, LinkedIn, Instagram, Telegram, and Slack. You can summarize conversations, suggest replies, prioritize messages, and answer questions about the user's inbox. Be concise, helpful, and professional. Today's date: ${new Date().toDateString()}.`;
 
   const contextualMessage = conversationId
     ? `[Context: User is viewing conversation ${conversationId}]\n\n${message}`
     : message;
 
-  const response = await callOpenAI(systemPrompt, contextualMessage);
+  const response = await callOpenAI(systemPrompt, contextualMessage, conversationHistory);
 
   const msgId = `xan_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
   const assistantId = `xan_${Date.now() + 1}_${Math.random().toString(36).slice(2, 9)}`;

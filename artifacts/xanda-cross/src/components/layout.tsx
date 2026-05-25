@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useGetMe, useHealthCheck } from "@workspace/api-client-react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { useClerk } from "@clerk/clerk-react";
 
 const navItems = [
   { href: "/", label: "Briefing", icon: LayoutDashboard },
@@ -54,18 +55,24 @@ function ThemeToggle() {
 
 function UserProfile() {
   const { data: user, isLoading } = useGetMe();
+  const { signOut } = useClerk();
 
   if (isLoading || !user || !user.email) return null;
 
   return (
     <div className="flex items-center gap-3 px-2 py-3 mt-4 border-t border-border">
-      <Avatar className="h-8 w-8">
+      <Avatar className="h-8 w-8 shrink-0">
         <AvatarImage src={user.avatarUrl || ''} />
         <AvatarFallback>{(user.email || "?").charAt(0).toUpperCase()}</AvatarFallback>
       </Avatar>
-      <div className="hidden md:block flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{user.firstName ? `${user.firstName} ${user.lastName}` : user.email}</p>
-        <p className="text-xs text-muted-foreground truncate">{user.status}</p>
+      <div className="hidden md:flex flex-1 min-w-0 items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">{user.firstName ? `${user.firstName} ${user.lastName ?? ""}`.trim() : user.email}</p>
+          <p className="text-xs text-muted-foreground truncate">{user.status}</p>
+        </div>
+        <Button variant="ghost" size="icon" className="shrink-0 h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => signOut()} title="Sign out">
+          <LogOut className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );

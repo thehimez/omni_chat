@@ -35,3 +35,4 @@ externalPort = 3000
 [userenv.shared]
 PORT = "8080"
 BASE_PATH = "/"
+UNIPILE_HOST = "api19.unipile.com:14946"

@@ -2,6 +2,7 @@ import { type Request, type Response, type NextFunction } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { logger } from "../lib/logger";
+import { createClerkClient } from "@clerk/backend";
 
 const DEMO_USER_ID = "demo_user_xanda";
 const DEMO_CLERK_ID = "demo_clerk_id";
@@ -28,10 +29,8 @@ async function ensureDemoUser(): Promise<typeof usersTable.$inferSelect> {
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
 
-  // Demo mode: no Clerk configured -> use demo user for any bearer token
-  const clerkPublishableKey = process.env.VITE_CLERK_PUBLISHABLE_KEY;
   const clerkSecretKey = process.env.CLERK_SECRET_KEY;
-  const isDemoMode = !clerkPublishableKey || !clerkSecretKey;
+  const isDemoMode = !clerkSecretKey;
 
   if (isDemoMode) {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -44,7 +43,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return;
   }
 
-  // Production mode: Clerk JWT verification
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     res.status(401).json({ error: "Unauthorized" });
     return;
@@ -52,21 +50,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const token = authHeader.slice(7);
 
   try {
-    const response = await fetch("https://api.clerk.com/v1/tokens/verify", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${clerkSecretKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ token }),
-    });
-
-    if (!response.ok) {
-      res.status(401).json({ error: "Invalid token" });
-      return;
-    }
-
-    const payload = await response.json() as { sub: string; email_address?: string };
+    const clerk = createClerkClient({ secretKey: clerkSecretKey });
+    const payload = await clerk.verifyToken(token);
     const clerkId = payload.sub;
 
     let dbUser = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId)).limit(1);
@@ -75,10 +60,16 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       const newId = `user_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+      // Fetch full user profile from Clerk
+      const clerkUser = await clerk.users.getUser(clerkId);
+      const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
       await db.insert(usersTable).values({
         id: newId,
         clerkId,
-        email: payload.email_address ?? "",
+        email,
+        firstName: clerkUser.firstName ?? null,
+        lastName: clerkUser.lastName ?? null,
+        avatarUrl: clerkUser.imageUrl ?? null,
         status: "trial",
         trialEndsAt,
       });
