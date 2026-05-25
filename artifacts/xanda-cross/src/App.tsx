@@ -1,8 +1,8 @@
+import React from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SignIn, useAuth } from "@clerk/clerk-react";
 import Layout from "@/components/layout";
 import Briefing from "@/pages/Briefing";
 import Inbox from "@/pages/Inbox";
@@ -18,7 +18,7 @@ import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
 
-function Router() {
+function AppRoutes() {
   return (
     <Layout>
       <Switch>
@@ -38,42 +38,26 @@ function Router() {
   );
 }
 
-function AuthGate() {
-  const { isLoaded, isSignedIn } = useAuth();
-
-  if (!isLoaded) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground text-sm">Loading...</div>
-      </div>
-    );
-  }
-
-  if (!isSignedIn) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">X</div>
-            <span className="font-bold text-2xl tracking-tight uppercase">XANDA</span>
-          </div>
-          <SignIn routing="hash" />
-        </div>
-      </div>
-    );
-  }
-
-  return <Router />;
+function DevBanner() {
+  return (
+    <div
+      style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 9999 }}
+      className="bg-amber-500 text-black text-xs text-center py-1.5 font-semibold tracking-wide"
+    >
+      DEV MODE — Clerk not configured. Signed in as demo@xandacross.com
+    </div>
+  );
 }
 
-function App() {
+function App({ devMode }: { devMode: boolean }) {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthGate />
+          <AppRoutes />
         </WouterRouter>
         <Toaster />
+        {devMode && <DevBanner />}
       </TooltipProvider>
     </QueryClientProvider>
   );
