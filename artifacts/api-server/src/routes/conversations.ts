@@ -47,7 +47,7 @@ router.get("/conversations", requireAuth, async (req: Request, res: Response): P
       contactId: c.contactId ?? null,
       topicLabel: c.topicLabel ?? null,
       headline: c.headline ?? null,
-      preview: null,
+      preview: c.headline ?? null,
       priority: c.priority,
       isRead: c.isRead,
       lastMessageAt: c.lastMessageAt.toISOString(),

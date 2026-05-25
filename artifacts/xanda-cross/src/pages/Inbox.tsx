@@ -191,15 +191,23 @@ function ConversationView({ id }: { id: string }) {
   const [draftGenerated, setDraftGenerated] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const markedReadRef = useRef<string | null>(null);
   useEffect(() => {
-    if (conv && !conv.messages[conv.messages.length - 1]?.isRead) {
-      markRead.mutate({ id }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
-        }
-      });
+    if (conv && markedReadRef.current !== id) {
+      const lastMsg = conv.messages[conv.messages.length - 1];
+      if (lastMsg && !lastMsg.isRead) {
+        markedReadRef.current = id;
+        markRead.mutate({ id }, {
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
+          }
+        });
+      } else if (lastMsg) {
+        markedReadRef.current = id;
+      }
     }
-  }, [conv, id, markRead, queryClient]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, conv?.messages?.length]);
 
   useEffect(() => {
     if (scrollRef.current) {

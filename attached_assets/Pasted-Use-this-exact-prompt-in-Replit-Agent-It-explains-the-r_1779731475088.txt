@@ -1,0 +1,403 @@
+Use this exact prompt in Replit Agent. It explains the real root cause and gives the correct architecture fixes instead of superficial UI patches.
+
+---
+
+# PROMPT FOR REPLIT AGENT
+
+You need to fix the Unified Inbox architecture and performance problems in my Xanda Cross app.
+
+The current behavior is broken:
+
+* Most conversations appear as:
+
+  * “Unknown”
+  * “No preview”
+* Clicking conversations takes several seconds
+* Sometimes messages never load
+* WhatsApp conversations are incomplete
+* Gmail sender names are not displayed correctly
+* LinkedIn names are missing
+* Inbox feels extremely slow compared to native apps
+
+I want this fixed properly at the data-model + sync + rendering level.
+
+IMPORTANT:
+Do NOT apply temporary UI hacks.
+Do NOT hardcode names.
+Fix the real underlying architecture.
+
+---
+
+# ROOT CAUSES TO FIX
+
+The current implementation is likely:
+
+1. Fetching conversation details lazily on click
+2. Not storing participant metadata locally
+3. Not caching conversation previews
+4. Not normalizing platform data
+5. Making live API calls every time a chat opens
+6. Rendering before WhatsApp sync completes
+7. Not resolving sender names correctly
+8. Not preloading message previews
+9. Possibly sequential API requests instead of batched/parallel
+
+This must be redesigned.
+
+---
+
+# TARGET BEHAVIOR
+
+The inbox should behave like:
+
+* Gmail
+* WhatsApp Web
+* LinkedIn Messaging
+* Slack
+
+Meaning:
+
+✅ Conversation list loads instantly
+✅ Names visible immediately
+✅ Last message preview visible
+✅ Clicking chat opens instantly
+✅ Messages already cached locally
+✅ Background sync updates silently
+✅ Platform-specific names display correctly
+
+---
+
+# VERY IMPORTANT NAME DISPLAY LOGIC
+
+Implement proper participant-name extraction per platform.
+
+## Gmail Logic
+
+For Gmail:
+
+Conversation title MUST use:
+
+* sender display name from the email headers
+* NOT the raw email
+* NOT “Unknown”
+
+Example:
+
+From:
+Google Cloud Platform [cloudplatform-noreply@google.com](mailto:cloudplatform-noreply@google.com)
+
+Display:
+Google Cloud Platform
+
+NOT:
+Unknown
+
+NOT:
+[cloudplatform-noreply@google.com](mailto:cloudplatform-noreply@google.com)
+
+Implementation:
+
+Parse:
+
+* `From`
+* `Reply-To`
+* sender headers
+
+Extract:
+
+* display name
+* fallback to email username if display name missing
+
+Examples:
+
+"Google Cloud Platform [test@gmail.com](mailto:test@gmail.com)"
+→ "Google Cloud Platform"
+
+If no display name:
+"[johnsmith@gmail.com](mailto:johnsmith@gmail.com)"
+→ "johnsmith"
+
+Store this normalized value in database.
+
+---
+
+## WhatsApp Logic
+
+For WhatsApp:
+
+Conversation title priority:
+
+1. Contact name from WhatsApp profile
+2. Saved contact name
+3. Push name
+4. Phone number fallback
+
+NEVER show:
+
+* Unknown
+* Empty names
+
+Also:
+
+WhatsApp sync must NOT appear completed until:
+
+* chats loaded
+* participants loaded
+* previews loaded
+
+Show:
+“Syncing WhatsApp conversations…”
+
+until fully indexed.
+
+---
+
+## LinkedIn Logic
+
+For LinkedIn:
+
+Always display:
+
+* Full first name + last name
+
+Example:
+“Himesh Stark”
+
+NOT:
+Unknown
+
+Pull:
+
+* participant profile names
+* public identifiers
+* profile metadata
+
+Cache locally.
+
+---
+
+# PERFORMANCE FIXES (VERY IMPORTANT)
+
+Currently chat opening is extremely slow.
+
+Native apps are fast because they DO NOT fetch everything live on click.
+
+Implement proper architecture:
+
+---
+
+# REQUIRED ARCHITECTURE
+
+## 1. Local Conversation Cache
+
+Create normalized DB tables:
+
+### conversations
+
+* id
+* platform
+* external_id
+* title
+* avatar
+* last_message_preview
+* last_message_at
+* unread_count
+* participant_ids
+* sync_status
+
+### participants
+
+* id
+* platform
+* external_id
+* full_name
+* avatar
+* email
+* phone
+
+### messages
+
+* id
+* conversation_id
+* sender_id
+* content
+* timestamp
+* cached
+
+Store EVERYTHING locally after sync.
+
+---
+
+## 2. Preload Conversation Data
+
+When inbox loads:
+
+DO NOT:
+
+* fetch conversation metadata one-by-one
+
+Instead:
+
+* preload conversation list
+* preload titles
+* preload previews
+* preload avatars
+* preload latest messages
+
+Single batched query.
+
+---
+
+## 3. Instant Chat Opening
+
+When clicking conversation:
+
+Load immediately from local DB/cache.
+
+DO NOT:
+
+* wait for Unipile API response
+
+Instead:
+
+1. show cached messages instantly
+2. refresh silently in background
+
+This is critical.
+
+---
+
+## 4. Background Sync Architecture
+
+Implement:
+
+### Initial Sync
+
+* heavy
+* fetch all metadata
+* fetch recent messages
+* build indexes
+
+### Incremental Sync
+
+* lightweight
+* webhook-driven
+* append only new messages
+
+Do NOT fully refetch everything every time.
+
+---
+
+## 5. Proper Loading States
+
+For WhatsApp especially:
+
+Show:
+
+* “Syncing chats…”
+* “Loading participants…”
+* “Preparing previews…”
+
+instead of showing broken Unknown entries.
+
+---
+
+## 6. Conversation Preview Logic
+
+Each inbox item should display:
+
+* title
+* avatar
+* last message snippet
+* timestamp
+* unread badge
+
+Example:
+
+Google Cloud Platform
+“Help Google verify your account…”
+11:12 PM
+
+NOT:
+Unknown
+No preview
+
+---
+
+## 7. Message Fetch Optimization
+
+Implement:
+
+* pagination
+* lazy older-message loading
+* virtualized rendering
+
+Load:
+
+* latest 30 messages instantly
+
+Load older only on scroll.
+
+---
+
+## 8. Parallel Syncing
+
+Current sync may be sequential.
+
+Fix:
+
+Use Promise.all for:
+
+* participant fetches
+* conversation fetches
+* metadata fetches
+
+Massively reduce sync time.
+
+---
+
+# VERY IMPORTANT
+
+The inbox should NEVER render empty placeholder conversations before metadata arrives.
+
+Only render conversations AFTER:
+
+* participant name resolved
+* preview resolved
+
+Otherwise hold them in syncing state.
+
+---
+
+# UI EXPECTATION
+
+Final inbox should look close to:
+
+* Gmail
+* Superhuman
+* WhatsApp Web
+* Slack
+
+Fast.
+Instant.
+No “Unknown”.
+No “No preview”.
+
+---
+
+# DELIVERABLES
+
+After implementing:
+
+1. Show screenshots
+2. Explain new architecture
+3. Explain caching strategy
+4. Explain sync lifecycle
+5. Explain performance improvements
+6. Measure inbox open speed before vs after
+
+DO NOT stop until:
+
+* names display correctly
+* previews display correctly
+* chat opening feels instant

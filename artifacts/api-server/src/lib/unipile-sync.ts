@@ -9,6 +9,113 @@ function unipileHeaders(apiKey: string) {
   return { "X-API-KEY": apiKey, "Content-Type": "application/json", Accept: "application/json" };
 }
 
+/**
+ * Extract a human-readable display name from Unipile attendee fields.
+ * Priority: display_name → parse "Name <email>" → humanize email username → identifier as-is
+ */
+function extractDisplayName(
+  displayName?: string | null,
+  identifier?: string | null,
+): string {
+  if (displayName?.trim()) return displayName.trim();
+  if (!identifier) return "Unknown";
+  const angleMatch = identifier.match(/^"?(.+?)"?\s*<[^>]+>$/);
+  if (angleMatch) return angleMatch[1].trim();
+  const atIdx = identifier.indexOf("@");
+  if (atIdx > 0) {
+    const username = identifier.slice(0, atIdx);
+    return username
+      .split(/[._+\-]/)
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ");
+  }
+  return identifier;
+}
+
+function formatPhone(identifier?: string | null): string {
+  if (!identifier) return "Unknown";
+  const raw = identifier.split("@")[0];
+  return raw.startsWith("+") ? raw : `+${raw}`;
+}
+
+/** Strip HTML tags to get plain text */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Clean + truncate a string for use as a message preview */
+function truncate(text: string | null | undefined, max = 120): string | null {
+  if (!text?.trim()) return null;
+  const cleaned = text
+    .replace(/\{\{[^}]+\}\}\s*/g, "")   // strip {{WhatsApp LID}} tokens
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return null;
+  return cleaned.length > max ? cleaned.slice(0, max) + "…" : cleaned;
+}
+
+// ─── Chat attendees ────────────────────────────────────────────────────────────
+
+interface UnipileAttendee {
+  id?: string;
+  name?: string | null;
+  is_self?: number;
+  public_identifier?: string | null;
+  picture_url?: string | null;
+  specifics?: { phone_number?: string | null; [k: string]: unknown };
+}
+
+async function fetchChatAttendees(
+  chatId: string,
+  host: string,
+  apiKey: string,
+): Promise<UnipileAttendee[]> {
+  try {
+    const resp = await fetch(`https://${host}/api/v1/chats/${chatId}/attendees`, {
+      headers: unipileHeaders(apiKey),
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json() as { items?: UnipileAttendee[] };
+    return data.items ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Resolve the best possible contact name for a chat conversation */
+function resolveChatName(
+  chatName: string | null | undefined,
+  chatSubject: string | null | undefined,
+  isGroup: boolean,
+  attendees: UnipileAttendee[],
+  platform: string,
+  chatAttendeePublicId?: string | null,
+): string {
+  if (isGroup && chatName?.trim()) return chatName.trim();
+  const other = attendees.find((a) => !a.is_self);
+  if (other?.name?.trim()) return other.name.trim();
+  if (platform === "whatsapp") {
+    const phone =
+      other?.specifics?.phone_number ??
+      (other?.public_identifier ? formatPhone(other.public_identifier) : null) ??
+      (chatAttendeePublicId ? formatPhone(chatAttendeePublicId) : null);
+    if (phone) return phone;
+  }
+  if (chatName?.trim()) return chatName.trim();
+  if (chatSubject?.trim()) return chatSubject.trim();
+  return "Unknown";
+}
+
 // ─── Email sync (Gmail / Outlook) ─────────────────────────────────────────────
 
 async function syncEmails(
@@ -18,11 +125,10 @@ async function syncEmails(
   host: string,
   apiKey: string,
 ): Promise<number> {
-  const url = `https://${host}/api/v1/emails?account_id=${unipileAccountId}&limit=40`;
+  const url = `https://${host}/api/v1/emails?account_id=${unipileAccountId}&limit=50`;
   const resp = await fetch(url, { headers: unipileHeaders(apiKey) });
   if (!resp.ok) {
-    const body = await resp.text();
-    logger.warn({ status: resp.status, body }, "Unipile emails fetch failed");
+    logger.warn({ status: resp.status }, "Unipile emails fetch failed");
     return 0;
   }
 
@@ -30,20 +136,22 @@ async function syncEmails(
     items?: Array<{
       id: string;
       thread_id?: string;
-      account_id?: string;
-      from_attendee?: { name?: string; identifier?: string };
-      subject?: string;
-      snippet?: string;
-      date?: string;
+      from_attendee?: {
+        display_name?: string | null;
+        identifier?: string | null;
+      };
+      subject?: string | null;
+      body_plain?: string | null;
+      body?: string | null;
+      date?: string | null;
       unread?: boolean;
-      folders?: string[];
     }>;
   };
 
   const emails = data.items ?? [];
   if (emails.length === 0) return 0;
 
-  // Group by thread_id so one conversation = one thread
+  // Group by thread_id
   const threads = new Map<string, typeof emails>();
   for (const email of emails) {
     const key = email.thread_id ?? email.id;
@@ -52,72 +160,120 @@ async function syncEmails(
   }
 
   let saved = 0;
-  for (const [threadId, threadEmails] of threads) {
-    // Sort oldest first
-    threadEmails.sort((a, b) => new Date(a.date ?? 0).getTime() - new Date(b.date ?? 0).getTime());
-    const latest = threadEmails[threadEmails.length - 1];
-    const contactName = latest.from_attendee?.name ?? latest.from_attendee?.identifier ?? "Unknown";
-    const subject = latest.subject ?? "(No subject)";
 
+  for (const [threadId, threadEmails] of threads) {
+    threadEmails.sort(
+      (a, b) => new Date(a.date ?? 0).getTime() - new Date(b.date ?? 0).getTime(),
+    );
+    const latest = threadEmails[threadEmails.length - 1];
+
+    const contactName = extractDisplayName(
+      latest.from_attendee?.display_name,
+      latest.from_attendee?.identifier,
+    );
+    const subject = latest.subject ?? "(No subject)";
+    const rawBody = latest.body_plain ?? (latest.body ? stripHtml(latest.body) : null);
+    const headline = truncate(rawBody);
     const convId = `conv_${accountId}_${threadId.slice(-16)}`;
 
-    // Upsert conversation
-    const existing = await db
-      .select()
-      .from(conversationsTable)
-      .where(and(eq(conversationsTable.userId, userId), eq(conversationsTable.externalId, threadId)))
-      .limit(1);
-
-    if (!existing[0]) {
-      await db.insert(conversationsTable).values({
+    await db
+      .insert(conversationsTable)
+      .values({
         id: convId,
         userId,
         platform: "gmail",
         externalId: threadId,
         contactName,
         topicLabel: subject,
-        headline: latest.snippet?.slice(0, 120) ?? null,
+        headline,
         priority: "medium",
         isRead: !(latest.unread ?? false),
         unreadCount: threadEmails.filter((e) => e.unread).length,
         lastMessageAt: latest.date ? new Date(latest.date) : new Date(),
-      }).onConflictDoNothing();
-    }
+      })
+      .onConflictDoUpdate({
+        target: conversationsTable.id,
+        set: {
+          contactName,
+          topicLabel: subject,
+          headline,
+          isRead: !(latest.unread ?? false),
+          unreadCount: threadEmails.filter((e) => e.unread).length,
+          lastMessageAt: latest.date ? new Date(latest.date) : new Date(),
+        },
+      });
 
-    const actualConvId = existing[0]?.id ?? convId;
-
-    // Upsert messages for this thread
     for (const email of threadEmails) {
       const msgId = `msg_${accountId}_${email.id.slice(-20)}`;
-      const existingMsg = await db
-        .select()
-        .from(messagesTable)
-        .where(eq(messagesTable.externalId, email.id))
-        .limit(1);
+      const senderName = extractDisplayName(
+        email.from_attendee?.display_name,
+        email.from_attendee?.identifier,
+      );
+      const bodyText = truncate(email.body_plain ?? email.body, 500) ?? "(No content)";
 
-      if (!existingMsg[0]) {
-        const senderName = email.from_attendee?.name ?? email.from_attendee?.identifier ?? "Unknown";
-        await db.insert(messagesTable).values({
+      await db
+        .insert(messagesTable)
+        .values({
           id: msgId,
-          conversationId: actualConvId,
+          conversationId: convId,
           userId,
           platform: "gmail",
           externalId: email.id,
           direction: "inbound",
-          bodyText: email.snippet ?? "(No preview)",
+          bodyText,
           senderName,
           isRead: !(email.unread ?? false),
           sentAt: email.date ? new Date(email.date) : new Date(),
-        }).onConflictDoNothing();
-        saved++;
-      }
+        })
+        .onConflictDoUpdate({
+          target: messagesTable.id,
+          set: { bodyText, senderName, isRead: !(email.unread ?? false) },
+        });
+      saved++;
     }
   }
 
   return saved;
 }
 
-// ─── Chat sync (WhatsApp, LinkedIn, Telegram, Instagram…) ────────────────────
+// ─── Chat sync (WhatsApp, LinkedIn, Telegram, Instagram…) ─────────────────────
+
+interface UnipileChat {
+  id: string;
+  name?: string | null;
+  subject?: string | null;
+  type?: number;
+  timestamp?: string | null;
+  last_message_date?: string | null;
+  unread_count?: number;
+  attendee_public_identifier?: string | null;
+}
+
+interface UnipileChatMessage {
+  id: string;
+  text?: string | null;
+  body?: string | null;
+  is_sender?: number | boolean;
+  timestamp?: string | null;
+  date?: string | null;
+}
+
+async function fetchRecentMessages(
+  chatId: string,
+  host: string,
+  apiKey: string,
+): Promise<UnipileChatMessage[]> {
+  try {
+    const resp = await fetch(`https://${host}/api/v1/chats/${chatId}/messages?limit=20`, {
+      headers: unipileHeaders(apiKey),
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json() as { items?: UnipileChatMessage[] };
+    return data.items ?? [];
+  } catch {
+    return [];
+  }
+}
 
 async function syncChats(
   userId: string,
@@ -130,107 +286,104 @@ async function syncChats(
   const url = `https://${host}/api/v1/chats?account_id=${unipileAccountId}&limit=30`;
   const resp = await fetch(url, { headers: unipileHeaders(apiKey) });
   if (!resp.ok) {
-    const body = await resp.text();
-    logger.warn({ status: resp.status, body, platform }, "Unipile chats fetch failed");
+    logger.warn({ status: resp.status, platform }, "Unipile chats fetch failed");
     return 0;
   }
 
-  const data = await resp.json() as {
-    items?: Array<{
-      id: string;
-      account_id?: string;
-      provider?: string;
-      name?: string;
-      last_message_date?: string;
-      unread_count?: number;
-      attendees?: Array<{ name?: string; identifier?: string; is_sender?: boolean }>;
-    }>;
-  };
-
+  const data = await resp.json() as { items?: UnipileChat[] };
   const chats = data.items ?? [];
   if (chats.length === 0) return 0;
 
+  // Fetch attendees + messages in parallel, batched to avoid rate limits
+  const BATCH_SIZE = 5;
+  const chatDetails: Array<{
+    chat: UnipileChat;
+    attendees: UnipileAttendee[];
+    messages: UnipileChatMessage[];
+  }> = [];
+
+  for (let i = 0; i < chats.length; i += BATCH_SIZE) {
+    const batch = chats.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map(async (chat) => ({
+        chat,
+        attendees: await fetchChatAttendees(chat.id, host, apiKey),
+        messages: await fetchRecentMessages(chat.id, host, apiKey),
+      })),
+    );
+    chatDetails.push(...results);
+  }
+
   let saved = 0;
 
-  for (const chat of chats.slice(0, 25)) {
-    const chatId = chat.id;
-    const contactName = chat.name ?? chat.attendees?.find((a) => !a.is_sender)?.name ?? "Unknown";
-    const convId = `conv_${accountId}_${chatId.slice(-16)}`;
+  for (const { chat, attendees, messages } of chatDetails) {
+    const isGroup = (chat.type ?? 0) > 0;
+    const contactName = resolveChatName(chat.name, chat.subject, isGroup, attendees, platform, chat.attendee_public_identifier);
 
-    // Upsert conversation
-    const existing = await db
-      .select()
-      .from(conversationsTable)
-      .where(and(eq(conversationsTable.userId, userId), eq(conversationsTable.externalId, chatId)))
-      .limit(1);
+    // Latest message preview — messages come newest-first
+    const latestMsg = messages[0];
+    const headline = truncate(latestMsg?.text ?? latestMsg?.body);
 
-    if (!existing[0]) {
-      await db.insert(conversationsTable).values({
+    const other = attendees.find((a) => !a.is_self);
+    const avatarUrl = (other as any)?.picture_url ?? null;
+
+    const convId = `conv_${accountId}_${chat.id.slice(-16)}`;
+    const lastAt = chat.last_message_date ?? chat.timestamp ?? new Date().toISOString();
+
+    await db
+      .insert(conversationsTable)
+      .values({
         id: convId,
         userId,
         platform,
-        externalId: chatId,
+        externalId: chat.id,
         contactName,
+        headline,
+        contactAvatarUrl: avatarUrl,
         priority: "medium",
         isRead: (chat.unread_count ?? 0) === 0,
         unreadCount: chat.unread_count ?? 0,
-        lastMessageAt: chat.last_message_date ? new Date(chat.last_message_date) : new Date(),
-      }).onConflictDoNothing();
-    }
+        lastMessageAt: new Date(lastAt),
+      })
+      .onConflictDoUpdate({
+        target: conversationsTable.id,
+        set: {
+          contactName,
+          headline,
+          contactAvatarUrl: avatarUrl,
+          unreadCount: chat.unread_count ?? 0,
+          isRead: (chat.unread_count ?? 0) === 0,
+          lastMessageAt: new Date(lastAt),
+        },
+      });
 
-    const actualConvId = existing[0]?.id ?? convId;
+    // Store messages oldest-first (reverse the newest-first array)
+    for (const msg of [...messages].reverse()) {
+      const msgId = `msg_${accountId}_${msg.id.slice(-20)}`;
+      const bodyText = truncate(msg.text ?? msg.body, 500) ?? "(Media)";
+      const isSender = msg.is_sender === 1 || msg.is_sender === true;
+      const senderName = isSender ? "Me" : contactName;
+      const sentAt = msg.date ?? msg.timestamp;
 
-    // Fetch recent messages for this chat
-    try {
-      const msgUrl = `https://${host}/api/v1/chats/${chatId}/messages?limit=15`;
-      const msgResp = await fetch(msgUrl, { headers: unipileHeaders(apiKey) });
-      if (!msgResp.ok) continue;
-
-      const msgData = await msgResp.json() as {
-        items?: Array<{
-          id: string;
-          text?: string;
-          body?: string;
-          is_sender?: boolean;
-          sender?: { name?: string; display_name?: string; identifier?: string };
-          from?: { name?: string };
-          date?: string;
-          timestamp?: string;
-        }>;
-      };
-
-      for (const msg of (msgData.items ?? []).reverse()) {
-        const msgId = `msg_${accountId}_${msg.id.slice(-20)}`;
-        const existingMsg = await db
-          .select()
-          .from(messagesTable)
-          .where(eq(messagesTable.externalId, msg.id))
-          .limit(1);
-
-        if (!existingMsg[0]) {
-          const senderName =
-            msg.sender?.name ?? msg.sender?.display_name ?? msg.sender?.identifier ??
-            msg.from?.name ?? "Unknown";
-          const bodyText = msg.text ?? msg.body ?? "";
-          const sentAt = msg.date ?? msg.timestamp;
-
-          await db.insert(messagesTable).values({
-            id: msgId,
-            conversationId: actualConvId,
-            userId,
-            platform,
-            externalId: msg.id,
-            direction: msg.is_sender ? "outbound" : "inbound",
-            bodyText: bodyText || "(Media message)",
-            senderName,
-            isRead: true,
-            sentAt: sentAt ? new Date(sentAt) : new Date(),
-          }).onConflictDoNothing();
-          saved++;
-        }
-      }
-    } catch (err) {
-      logger.warn({ err, chatId }, "Failed to fetch messages for chat");
+      await db
+        .insert(messagesTable)
+        .values({
+          id: msgId,
+          conversationId: convId,
+          userId,
+          platform,
+          externalId: msg.id,
+          direction: isSender ? "outbound" : "inbound",
+          bodyText,
+          senderName,
+          isRead: true,
+          sentAt: sentAt ? new Date(sentAt) : new Date(),
+        })
+        .onConflictDoUpdate({
+          target: messagesTable.id,
+          set: { bodyText, senderName },
+        });
+      saved++;
     }
   }
 
@@ -239,16 +392,23 @@ async function syncChats(
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
-export async function syncAccount(accountDbId: string, userId: string): Promise<{ synced: number; platform: string }> {
+export async function syncAccount(
+  accountDbId: string,
+  userId: string,
+): Promise<{ synced: number; platform: string }> {
   const apiKey = process.env.UNIPILE_API_KEY;
-  const host = process.env.UNIPILE_DSN ?? process.env.UNIPILE_HOST ?? "api19.unipile.com:14946";
-
+  const host = process.env.UNIPILE_DSN ?? "api19.unipile.com:14946";
   if (!apiKey) throw new Error("UNIPILE_API_KEY not set");
 
   const account = await db
     .select()
     .from(connectedAccountsTable)
-    .where(and(eq(connectedAccountsTable.id, accountDbId), eq(connectedAccountsTable.userId, userId)))
+    .where(
+      and(
+        eq(connectedAccountsTable.id, accountDbId),
+        eq(connectedAccountsTable.userId, userId),
+      ),
+    )
     .limit(1);
 
   if (!account[0]) throw new Error("Account not found");
