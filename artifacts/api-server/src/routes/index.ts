@@ -12,6 +12,7 @@ import notificationsRouter from "./notifications";
 import billingRouter from "./billing";
 import webhooksRouter from "./webhooks";
 import adminRouter from "./admin";
+import unipoleDiagnosticRouter from "./unipile-diagnostic";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(notificationsRouter);
 router.use(billingRouter);
 router.use(webhooksRouter);
 router.use(adminRouter);
+router.use(unipoleDiagnosticRouter);
 
 export default router;

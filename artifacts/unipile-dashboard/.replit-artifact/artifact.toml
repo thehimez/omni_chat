@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Unipile Messaging Dashboard"
+version = "1.0.0"
+id = "artifacts/unipile-dashboard"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22800
+
+[services.development]
+run = "pnpm --filter @workspace/unipile-dashboard run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/unipile-dashboard", "run", "build" ]
+publicDir = "artifacts/unipile-dashboard/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22800"
+BASE_PATH = "/"
