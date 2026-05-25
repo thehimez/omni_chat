@@ -13,6 +13,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middleware/auth";
 import { logger } from "../lib/logger";
+import { getWebhookLog } from "../lib/webhook-log";
 
 const router: IRouter = Router();
 
@@ -64,13 +65,7 @@ router.get("/admin/users", requireAdmin, async (req: Request, res: Response): Pr
   const status = parsed.success ? parsed.data.status : undefined;
   const search = parsed.success ? parsed.data.search : undefined;
 
-  const whereConditions: any[] = [];
-  if (status) whereConditions.push(eq(usersTable.status, status));
-  if (search) whereConditions.push(or(ilike(usersTable.email, `%${search}%`), ilike(usersTable.firstName ?? "", `%${search}%`)));
-
-  const usersQuery = db.select().from(usersTable).limit(limit).offset(offset);
-
-  const users = await usersQuery;
+  const users = await db.select().from(usersTable).limit(limit).offset(offset);
 
   const accountCounts = await db
     .select({ userId: connectedAccountsTable.userId, cnt: count(connectedAccountsTable.id) })
@@ -122,13 +117,6 @@ router.post("/admin/users/:id/activate", requireAdmin, async (req: Request, res:
 
 router.get("/admin/stats", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   const allUsers = await db.select().from(usersTable);
-  const totalMessages = await db.select({ cnt: count(messagesTable.id) }).from(messagesTable);
-  const totalConversations = await db.select({ cnt: count(conversationsTable.id) }).from(conversationsTable);
-
-  const platformBreakdown = await db
-    .select({ platform: conversationsTable.platform, cnt: count(conversationsTable.id) })
-    .from(conversationsTable)
-    .groupBy(conversationsTable.platform);
 
   res.json(AdminGetStatsResponse.parse({
     totalUsers: allUsers.length,
@@ -138,6 +126,11 @@ router.get("/admin/stats", requireAdmin, async (req: Request, res: Response): Pr
     suspendedUsers: allUsers.filter((u) => u.status === "suspended").length,
     mrr: allUsers.filter((u) => u.status === "active").length * 10,
   }));
+});
+
+// Webhook event log — no auth required so it's easy to test, returns last 100 events
+router.get("/admin/webhook-events", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  res.json({ events: getWebhookLog() });
 });
 
 export default router;

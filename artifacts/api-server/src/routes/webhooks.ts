@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, usersTable, connectedAccountsTable, conversationsTable, messagesTable } from "@workspace/db";
 import { StripeWebhookResponse, UnipileWebhookResponse } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
+import { appendWebhookEvent } from "../lib/webhook-log";
 
 const router: IRouter = Router();
 
@@ -55,6 +56,14 @@ router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<voi
   res.json(StripeWebhookResponse.parse({ status: "ok" }));
 });
 
+// ─── Unipile event name constants (from Unipile dashboard) ───────────────────
+// Messaging events:  new_message | message_read | message_reaction | message_edit | message_delete | message_delivered
+// Account events:    account_creation_success | account_creation_fail | account_deletion |
+//                    account_reconnected | account_sync_success | account_stopped |
+//                    account_status_ok | account_connecting | account_error |
+//                    account_credentials | account_permissions
+// Legacy fallbacks:  account_connected | message_received (older Unipile versions)
+
 router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<void> => {
   try {
     const payload = req.body as {
@@ -63,62 +72,119 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
       data?: {
         id?: string;
         chat_id?: string;
+        thread_id?: string;
         text?: string;
-        sender?: { name?: string; id?: string };
+        body?: string;
+        sender?: { name?: string; display_name?: string; id?: string };
+        from?: { name?: string; display_name?: string };
         provider?: string;
         date?: string;
+        timestamp?: string;
       };
     };
 
-    logger.info({ event: payload.event }, "Unipile webhook received");
+    const event = payload.event ?? "unknown";
+    const accountId = payload.account_id ?? null;
+    const data = payload.data;
+    const provider = data?.provider ?? null;
 
-    if (payload.event === "account_connected" && payload.account_id) {
+    logger.info({ event, accountId, provider }, "Unipile webhook received");
+
+    // ── Build human-readable summary for the event log ──────────────────────
+    let summary = event;
+    if (provider) summary += ` (${provider})`;
+    if (data?.sender?.name || data?.sender?.display_name || data?.from?.name) {
+      summary += ` from ${data.sender?.name ?? data.sender?.display_name ?? data.from?.name}`;
+    }
+    if (data?.text || data?.body) {
+      const preview = (data.text ?? data.body ?? "").slice(0, 60);
+      if (preview) summary += `: "${preview}"`;
+    }
+
+    // Store in in-memory event log for the Admin panel
+    appendWebhookEvent({ event, accountId, provider, summary, raw: payload });
+
+    // ── Account events ───────────────────────────────────────────────────────
+    const isAccountConnected =
+      event === "account_creation_success" ||
+      event === "account_connected" ||       // legacy
+      event === "account_reconnected" ||
+      event === "account_sync_success";
+
+    const isAccountError =
+      event === "account_creation_fail" ||
+      event === "account_error" ||
+      event === "account_credentials";
+
+    const isAccountStopped =
+      event === "account_stopped" ||
+      event === "account_deletion";
+
+    if ((isAccountConnected || isAccountError || isAccountStopped) && accountId) {
+      const newStatus = isAccountConnected ? "connected" : isAccountStopped ? "disconnected" : "error";
+
       const accounts = await db
         .select()
         .from(connectedAccountsTable)
-        .where(eq(connectedAccountsTable.unipileAccountId, payload.account_id));
+        .where(eq(connectedAccountsTable.unipileAccountId, accountId));
 
       if (accounts[0]) {
         await db
           .update(connectedAccountsTable)
-          .set({ status: "connected", lastSyncAt: new Date() })
+          .set({
+            status: newStatus,
+            ...(isAccountConnected ? { lastSyncAt: new Date() } : {}),
+          })
           .where(eq(connectedAccountsTable.id, accounts[0].id));
       }
     }
 
-    if (payload.event === "message_received" && payload.data) {
-      const data = payload.data;
-      const convId = `conv_${data.chat_id ?? Date.now()}`;
-      const msgId = `msg_${data.id ?? Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    // ── Incoming message events ──────────────────────────────────────────────
+    const isNewMessage =
+      event === "new_message" ||
+      event === "message_received";   // legacy
 
-      const existing = await db
-        .select()
-        .from(conversationsTable)
-        .where(eq(conversationsTable.externalId, data.chat_id ?? ""))
-        .limit(1);
+    if (isNewMessage && data) {
+      const chatId = data.chat_id ?? data.thread_id;
+      if (!chatId) {
+        logger.warn({ event }, "new_message webhook missing chat_id");
+      } else {
+        const msgId = `msg_${data.id ?? Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        const senderName =
+          data.sender?.name ?? data.sender?.display_name ??
+          data.from?.name ?? data.from?.display_name ?? "Unknown";
+        const bodyText = data.text ?? data.body ?? "";
+        const sentAt = data.date ?? data.timestamp;
 
-      if (existing[0]) {
-        await db.insert(messagesTable).values({
-          id: msgId,
-          conversationId: existing[0].id,
-          userId: existing[0].userId,
-          platform: data.provider ?? "unknown",
-          externalId: data.id,
-          direction: "inbound",
-          bodyText: data.text ?? "",
-          senderName: data.sender?.name ?? "Unknown",
-          isRead: false,
-          sentAt: data.date ? new Date(data.date) : new Date(),
-        }).onConflictDoNothing();
+        const existing = await db
+          .select()
+          .from(conversationsTable)
+          .where(eq(conversationsTable.externalId, chatId))
+          .limit(1);
 
-        await db
-          .update(conversationsTable)
-          .set({
-            lastMessageAt: new Date(),
-            unreadCount: existing[0].unreadCount + 1,
+        if (existing[0]) {
+          await db.insert(messagesTable).values({
+            id: msgId,
+            conversationId: existing[0].id,
+            userId: existing[0].userId,
+            platform: provider ?? "unknown",
+            externalId: data.id,
+            direction: "inbound",
+            bodyText,
+            senderName,
             isRead: false,
-          })
-          .where(eq(conversationsTable.id, existing[0].id));
+            sentAt: sentAt ? new Date(sentAt) : new Date(),
+          }).onConflictDoNothing();
+
+          await db
+            .update(conversationsTable)
+            .set({
+              lastMessageAt: new Date(),
+              unreadCount: existing[0].unreadCount + 1,
+              isRead: false,
+            })
+            .where(eq(conversationsTable.id, existing[0].id));
+        }
       }
     }
   } catch (err) {
