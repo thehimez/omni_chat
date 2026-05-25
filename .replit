@@ -36,3 +36,6 @@ externalPort = 3000
 PORT = "8080"
 BASE_PATH = "/"
 UNIPILE_HOST = "api19.unipile.com:14946"
+ADMIN_EMAIL = "rimeshstark20@gmail.com"
+ADMIN_PASSWORD_HASH = "$2b$12$AE3TM6O2SuQ6h4KLQ4bNWuRWirw/vfeTRZYKCR6wUYQzOEbnJxSSC"
+ADMIN_JWT_SECRET = "xanda-admin-jwt-secret-2024"
