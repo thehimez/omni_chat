@@ -1,5 +1,5 @@
 kind = "web"
-previewPath = "/"
+previewPath = "/unipile/"
 title = "Unipile Messaging Dashboard"
 version = "1.0.0"
 id = "artifacts/unipile-dashboard"
@@ -11,7 +11,7 @@ version = "1.0.0"
 
 [[services]]
 name = "web"
-paths = [ "/" ]
+paths = [ "/unipile/" ]
 localPort = 22800
 
 [services.development]
@@ -28,4 +28,4 @@ to = "/index.html"
 
 [services.env]
 PORT = "22800"
-BASE_PATH = "/"
+BASE_PATH = "/unipile/"
