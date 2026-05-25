@@ -47,7 +47,7 @@ router.post("/messages/send", requireAuth, async (req: Request, res: Response): 
       if (slackData.ok) sentMessageId = slackData.ts ?? null;
     } else {
       const unipileApiKey = process.env.UNIPILE_API_KEY;
-      const unipileHost = process.env.UNIPILE_HOST ?? "api19.unipile.com:14946";
+      const unipileHost = process.env.UNIPILE_DSN ?? process.env.UNIPILE_HOST ?? "api19.unipile.com:14946";
       if (!unipileApiKey) {
         res.status(503).json({ error: "Unipile not configured" });
         return;

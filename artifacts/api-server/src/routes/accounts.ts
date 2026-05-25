@@ -16,6 +16,17 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
+const PLATFORM_TO_UNIPILE_PROVIDER: Record<string, string> = {
+  gmail: "GOOGLE",
+  outlook: "OUTLOOK",
+  whatsapp: "WHATSAPP",
+  linkedin: "LINKEDIN",
+  instagram: "INSTAGRAM",
+  telegram: "TELEGRAM",
+  messenger: "MESSENGER",
+  twitter: "TWITTER",
+};
+
 router.get("/accounts", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const user = (req as any).user;
   const accounts = await db
@@ -59,11 +70,21 @@ router.post("/accounts/connect", requireAuth, async (req: Request, res: Response
   }
 
   const unipileApiKey = process.env.UNIPILE_API_KEY;
-  const unipileHost = process.env.UNIPILE_HOST ?? "api19.unipile.com:14946";
+  const unipileHost = process.env.UNIPILE_DSN ?? process.env.UNIPILE_HOST ?? "api19.unipile.com:14946";
   if (!unipileApiKey) {
     res.status(503).json({ error: "Unipile not configured" });
     return;
   }
+
+  const provider = PLATFORM_TO_UNIPILE_PROVIDER[platform];
+  if (!provider) {
+    res.status(400).json({ error: `Unsupported platform: ${platform}` });
+    return;
+  }
+
+  const appUrl = process.env.APP_URL ?? "https://xandacross.com";
+
+  const expiresOn = new Date(Date.now() + 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, ".000Z");
 
   try {
     const resp = await fetch(`https://${unipileHost}/api/v1/hosted/accounts/link`, {
@@ -71,23 +92,28 @@ router.post("/accounts/connect", requireAuth, async (req: Request, res: Response
       headers: {
         "X-API-KEY": unipileApiKey,
         "Content-Type": "application/json",
+        "Accept": "application/json",
       },
       body: JSON.stringify({
-        type: platform.toUpperCase(),
+        type: "create",
+        providers: [provider],
+        expiresOn,
         api_url: `https://${unipileHost}`,
-        success_redirect_url: `${process.env.APP_URL ?? "https://xandacross.com"}/accounts?connected=${platform}`,
-        failure_redirect_url: `${process.env.APP_URL ?? "https://xandacross.com"}/accounts?error=true`,
+        name: user.id,
+        success_redirect_url: `${appUrl}/accounts?connected=${platform}`,
+        failure_redirect_url: `${appUrl}/accounts?error=true`,
       }),
     });
 
     if (!resp.ok) {
-      req.log.error({ status: resp.status }, "Unipile hosted auth error");
+      const errBody = await resp.text();
+      req.log.error({ status: resp.status, body: errBody }, "Unipile hosted auth error");
       res.status(502).json({ error: "Failed to initiate connection" });
       return;
     }
 
-    const data = await resp.json() as { url: string; object: string };
-    res.json(ConnectAccountResponse.parse({ authUrl: data.url, accountId: null }));
+    const data = await resp.json() as { url?: string; object?: string };
+    res.json(ConnectAccountResponse.parse({ authUrl: data.url ?? null, accountId: null }));
   } catch (err) {
     req.log.error({ err }, "Account connect error");
     res.status(500).json({ error: "Internal error" });
