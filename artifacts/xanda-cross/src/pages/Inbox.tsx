@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { 
   useGetConversations, 
   useGetConversation, 
@@ -25,8 +25,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Inbox() {
-  const searchParams = new URLSearchParams(window.location.search);
-  const selectedId = searchParams.get("id");
+  const search = useSearch();
+  const [, navigate] = useLocation();
+  const selectedId = new URLSearchParams(search).get("id");
 
   const { data: conversationsData, isLoading: isLoadingList, refetch } = useGetConversations();
   const { data: accountsData } = useGetConnectedAccounts();
@@ -126,7 +127,7 @@ export default function Inbox() {
                 {conversations.map((conv) => (
                   <button
                     key={conv.id}
-                    onClick={() => window.history.pushState({}, '', `/inbox?id=${conv.id}`)}
+                    onClick={() => navigate(`/inbox?id=${conv.id}`)}
                     className={`w-full text-left p-4 hover:bg-accent/50 transition-colors ${selectedId === conv.id ? 'bg-accent' : ''}`}
                   >
                     <div className="flex justify-between items-start mb-1">

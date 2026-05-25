@@ -19,6 +19,7 @@ import {
   Activity,
 } from "lucide-react";
 import { useGetMe, useHealthCheck } from "@workspace/api-client-react";
+import { useRealtime } from "@/hooks/use-realtime";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { useAppAuth } from "@/lib/auth";
 
@@ -110,6 +111,11 @@ function SystemStatus() {
   );
 }
 
+function RealtimeSync() {
+  useRealtime();
+  return null;
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const isAdmin = location.startsWith("/admin");
@@ -120,6 +126,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeProvider defaultTheme="dark">
+      <RealtimeSync />
       <div className="flex h-screen overflow-hidden bg-background text-foreground">
         <aside className="w-16 md:w-64 flex-shrink-0 border-r border-border bg-sidebar flex flex-col justify-between transition-all duration-300">
           <div className="p-4 space-y-6">

@@ -1,0 +1,286 @@
+```txt
+You need to fix a critical UX/navigation architecture bug in the Unified Inbox application.
+
+CURRENT BUG:
+When I click any conversation from the middle inbox list (WhatsApp/Gmail/LinkedIn), the conversation does NOT open instantly in the right-side chat panel.
+
+The only way the chat appears is after manually refreshing/reloading the entire page.
+
+Expected behavior:
+- User clicks a conversation
+- The conversation instantly opens in the right chat panel
+- No page reload required
+- Should feel like Gmail/Slack/WhatsApp Web
+- Navigation must be instant and reactive
+
+IMPORTANT CONTEXT:
+The app already has:
+- local PostgreSQL caching
+- synced conversations/messages
+- fast backend (~70ms)
+- unified inbox architecture
+- React frontend
+- conversation ID route query like:
+  /inbox?id=conv_acc_xxx
+
+So this is MOST LIKELY:
+- a frontend state synchronization issue
+- React routing issue
+- query-param hydration bug
+- stale state problem
+- missing useEffect dependency
+- broken selectedConversation state
+- async race condition
+- router navigation issue
+- server/client rendering mismatch
+- component not reacting to URL changes
+- or conversation cache not updating reactively
+
+YOUR TASK:
+Do a FULL root-cause analysis and permanently fix the architecture.
+
+--------------------------------------------------
+PHASE 1 — ROOT CAUSE ANALYSIS
+--------------------------------------------------
+
+Investigate ALL of these areas carefully:
+
+1. Inbox click handler
+- onClick behavior
+- router.push / navigate logic
+- selected conversation state updates
+- optimistic UI update behavior
+
+2. URL/query synchronization
+- Does the app rely only on refresh hydration?
+- Is the route param read only on mount?
+- Is useEffect missing dependencies?
+- Is selected conversation derived incorrectly?
+
+3. React rendering flow
+- Check:
+  - useEffect dependencies
+  - stale closures
+  - memoization bugs
+  - suspense/loading issues
+  - async fetch timing
+  - race conditions
+  - client/server hydration mismatch
+
+4. Conversation panel
+- Why does it render correctly ONLY after refresh?
+- Which state initializes on refresh but not on click?
+- Is there a missing invalidation/refetch?
+- Is component key incorrect?
+
+5. Data flow
+- inbox list
+- selectedConversation
+- messages cache
+- message query hooks
+- route state
+- React Query/SWR cache if used
+
+6. Realtime architecture
+- ensure selecting conversation is instant
+- preload/cached messages should render immediately
+- no blocking loading state
+
+--------------------------------------------------
+PHASE 2 — IMPLEMENT PROPER ARCHITECTURE
+--------------------------------------------------
+
+Implement a production-grade solution.
+
+GOALS:
+- Clicking chat instantly opens it
+- Zero reload required
+- URL stays synced
+- Browser back/forward works
+- State survives refresh
+- No flickering
+- No double-fetches
+- No race conditions
+- Works for:
+  - WhatsApp
+  - Gmail
+  - LinkedIn
+
+IMPLEMENT:
+
+1. Single source of truth
+Use ONE source of truth for selected conversation:
+- route param OR global state
+- not duplicated conflicting state
+
+2. Reactive routing
+Conversation panel must react immediately to:
+- URL param changes
+- state changes
+- cache changes
+
+3. Optimistic opening
+Immediately render cached conversation while background fetch updates.
+
+4. Prefetch strategy
+On hover or visible inbox rows:
+- prefetch messages
+- warm caches
+
+5. Stable component architecture
+Fix:
+- keys
+- suspense boundaries
+- dependency arrays
+- stale memoization
+
+6. Instant UI response
+Target:
+- conversation visible under 100ms
+
+--------------------------------------------------
+PHASE 3 — ADD REALTIME WEBHOOK SYNC SYSTEM
+--------------------------------------------------
+
+Now implement FULL webhook-driven incremental sync.
+
+Current problem:
+Users must press “Sync All”.
+
+NEW GOAL:
+New WhatsApp/Gmail/LinkedIn messages appear automatically in real time.
+
+IMPLEMENT COMPLETE ARCHITECTURE:
+
+--------------------------------------------------
+A. WEBHOOK ENDPOINTS
+--------------------------------------------------
+
+Create secure webhook handlers for:
+- WhatsApp
+- Gmail
+- LinkedIn
+- Unipile events
+
+Validate:
+- signatures
+- auth
+- payload structure
+
+--------------------------------------------------
+B. EVENT PROCESSING PIPELINE
+--------------------------------------------------
+
+When webhook received:
+1. Parse event
+2. Identify account/conversation
+3. Upsert message
+4. Upsert conversation preview
+5. Update unread counts
+6. Update timestamps
+7. Trigger realtime UI updates
+
+MUST USE:
+- idempotent processing
+- deduplication
+- retry-safe architecture
+
+--------------------------------------------------
+C. INCREMENTAL SYNC
+--------------------------------------------------
+
+DO NOT full-sync entire inbox.
+
+Only sync:
+- changed conversations
+- new messages
+- updated threads
+
+Implement:
+- delta sync
+- lastSyncedAt checkpoints
+- per-account cursors
+
+--------------------------------------------------
+D. REALTIME FRONTEND
+--------------------------------------------------
+
+When new message arrives:
+- inbox list updates instantly
+- unread count updates
+- preview updates
+- open conversation updates live
+- no refresh required
+
+Use:
+- WebSockets OR SSE
+- event-driven updates
+- optimistic cache mutation
+
+--------------------------------------------------
+E. PERFORMANCE
+--------------------------------------------------
+
+Requirements:
+- No heavy polling
+- No full reloads
+- No blocking API calls
+- Minimal DB writes
+- Batched updates
+- Efficient websocket broadcasting
+
+--------------------------------------------------
+F. DATABASE IMPROVEMENTS
+--------------------------------------------------
+
+Ensure:
+- indexes for conversation lookup
+- message dedupe keys
+- webhook event table
+- retry queue
+- sync checkpoints
+
+--------------------------------------------------
+G. FAILURE HANDLING
+--------------------------------------------------
+
+Implement:
+- webhook retry handling
+- dead-letter protection
+- duplicate event protection
+- partial sync recovery
+- reconnect logic for frontend realtime
+
+--------------------------------------------------
+PHASE 4 — VERIFY EVERYTHING
+--------------------------------------------------
+
+After implementation:
+1. Test clicking conversations rapidly
+2. Test switching chats repeatedly
+3. Test browser back/forward
+4. Test refresh persistence
+5. Test WhatsApp realtime arrival
+6. Test Gmail realtime arrival
+7. Test LinkedIn realtime arrival
+8. Test multiple accounts simultaneously
+9. Measure latency
+10. Remove all stale-state bugs
+
+--------------------------------------------------
+EXPECTED FINAL RESULT
+--------------------------------------------------
+
+After fix:
+- Clicking any conversation instantly opens it
+- No reload ever needed
+- Inbox behaves like a modern production messaging app
+- New messages appear live automatically
+- Sync All becomes optional/manual fallback only
+- Entire system feels realtime and production-grade
+
+IMPORTANT:
+Do NOT patch superficially.
+
+Do a full architectural fix with proper reactive state management and realtime event-driven syncing.
+```

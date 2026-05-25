@@ -13,6 +13,7 @@ import billingRouter from "./billing";
 import webhooksRouter from "./webhooks";
 import adminRouter from "./admin";
 import unipoleDiagnosticRouter from "./unipile-diagnostic";
+import eventsRouter from "./events";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(billingRouter);
 router.use(webhooksRouter);
 router.use(adminRouter);
 router.use(unipoleDiagnosticRouter);
+router.use(eventsRouter);
 
 export default router;

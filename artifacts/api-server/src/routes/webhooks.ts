@@ -4,6 +4,7 @@ import { db, usersTable, connectedAccountsTable, conversationsTable, messagesTab
 import { StripeWebhookResponse, UnipileWebhookResponse } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
 import { appendWebhookEvent } from "../lib/webhook-log";
+import { broadcastToUser } from "../lib/sse-broadcaster";
 
 const router: IRouter = Router();
 
@@ -206,11 +207,21 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
           await db
             .update(conversationsTable)
             .set({
+              headline: bodyText.slice(0, 120) || existing[0].headline,
               lastMessageAt: new Date(),
               unreadCount: existing[0].unreadCount + 1,
               isRead: false,
             })
             .where(eq(conversationsTable.id, existing[0].id));
+
+          broadcastToUser(existing[0].userId, "new_message", {
+            conversationId: existing[0].id,
+            senderName,
+            preview: bodyText.slice(0, 80),
+            platform: provider ?? "unknown",
+          });
+
+          logger.info({ conversationId: existing[0].id, userId: existing[0].userId }, "Broadcast new_message to SSE clients");
         }
       }
     }
