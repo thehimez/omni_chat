@@ -3,35 +3,93 @@ import { useLocation } from "wouter";
 import { 
   useGetConversations, 
   useGetConversation, 
+  useGetConnectedAccounts,
   useSendMessage,
   useRegenerateDraft,
   useMarkConversationRead,
+  useTriggerSync,
   getGetConversationsQueryKey,
-  getGetConversationQueryKey
+  getGetConversationQueryKey,
+  getGetConnectedAccountsQueryKey,
 } from "@workspace/api-client-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PlatformIcon } from "@/components/platform-icon";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Bot, Send, RefreshCw, Paperclip, MoreVertical, MessageSquare } from "lucide-react";
+import { Bot, Send, RefreshCw, Paperclip, MoreVertical, MessageSquare, Inbox as InboxIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Inbox() {
-  const [location] = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
   const selectedId = searchParams.get("id");
 
-  const { data: conversationsData, isLoading: isLoadingList } = useGetConversations();
+  const { data: conversationsData, isLoading: isLoadingList, refetch } = useGetConversations();
+  const { data: accountsData } = useGetConnectedAccounts();
+  const syncMutation = useTriggerSync();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [syncing, setSyncing] = useState(false);
+
   const conversations = conversationsData?.conversations || [];
+  const connectedAccounts = accountsData?.accounts?.filter((a) => a.status === "connected" || a.status === "syncing") ?? [];
+
+  const handleSyncAll = async () => {
+    if (connectedAccounts.length === 0) return;
+    setSyncing(true);
+    toast({ title: "Syncing all accounts…", description: "Your messages will appear shortly." });
+
+    await Promise.allSettled(
+      connectedAccounts.map((acc) =>
+        new Promise<void>((resolve) => {
+          syncMutation.mutate({ id: acc.id, data: { depth: "full" } }, {
+            onSuccess: () => resolve(),
+            onError: () => resolve(),
+          });
+        })
+      )
+    );
+
+    // Poll for conversations appearing — retry up to 6 times with 2s delay
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      await queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
+      const result = await queryClient.fetchQuery({ queryKey: getGetConversationsQueryKey() });
+      const count = (result as any)?.conversations?.length ?? 0;
+      if (count > 0 || attempts >= 6) {
+        clearInterval(poll);
+        setSyncing(false);
+        if (count > 0) {
+          toast({ title: `${count} conversations loaded`, description: "Your inbox is ready." });
+        } else {
+          toast({ title: "Sync complete", description: "No conversations found yet — they may take a moment to appear." });
+        }
+        queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
+      }
+    }, 2000);
+  };
 
   return (
     <div className="h-full w-full flex flex-col bg-background">
-      <header className="h-14 border-b flex items-center px-4 shrink-0 bg-card">
+      <header className="h-14 border-b flex items-center justify-between px-4 shrink-0 bg-card">
         <h1 className="font-semibold">Unified Inbox</h1>
+        {connectedAccounts.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs gap-2"
+            onClick={handleSyncAll}
+            disabled={syncing}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing…" : "Sync All"}
+          </Button>
+        )}
       </header>
       
       <ResizablePanelGroup direction="horizontal" className="flex-1">
@@ -40,6 +98,28 @@ export default function Inbox() {
             {isLoadingList ? (
               <div className="p-4 space-y-4">
                 {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-20 w-full" />)}
+              </div>
+            ) : conversations.length === 0 ? (
+              <div className="p-6 flex flex-col items-center justify-center text-center h-full min-h-[300px] gap-4">
+                <InboxIcon className="w-10 h-10 opacity-20" />
+                <div>
+                  <p className="font-medium text-sm mb-1">Your inbox is empty</p>
+                  {connectedAccounts.length > 0 ? (
+                    <>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        {connectedAccounts.length} account{connectedAccounts.length > 1 ? "s" : ""} connected — click to load your history
+                      </p>
+                      <Button size="sm" onClick={handleSyncAll} disabled={syncing} className="gap-2">
+                        <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+                        {syncing ? "Syncing…" : "Load Messages"}
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Connect an account in <a href="/accounts" className="underline text-primary">Accounts</a> first
+                    </p>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="divide-y">
@@ -51,26 +131,31 @@ export default function Inbox() {
                   >
                     <div className="flex justify-between items-start mb-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold line-clamp-1">{conv.contactName}</span>
-                        {!conv.isRead && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
+                        <span className="font-semibold text-sm line-clamp-1">{conv.contactName}</span>
+                        {!conv.isRead && conv.unreadCount > 0 && (
+                          <span className="min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center px-1 shrink-0">
+                            {conv.unreadCount}
+                          </span>
+                        )}
                       </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {format(new Date(conv.lastMessageAt), 'MMM d, h:mm a')}
+                      <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 ml-2">
+                        {format(new Date(conv.lastMessageAt), 'MMM d')}
                       </span>
                     </div>
                     
-                    <div className="flex items-center gap-2 mb-2">
-                      <PlatformIcon platform={conv.platform} />
-                      <span className="text-xs font-medium text-muted-foreground line-clamp-1">
-                        {conv.headline || conv.preview}
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <PlatformIcon platform={conv.platform} className="w-3 h-3 shrink-0" />
+                      <span className="text-xs text-muted-foreground line-clamp-1 flex-1">
+                        {conv.topicLabel || conv.headline || conv.preview || "No preview"}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {conv.priority === 'urgent' && <Badge variant="destructive" className="text-[10px] h-4">URGENT</Badge>}
-                      {conv.priority === 'high' && <Badge variant="default" className="text-[10px] h-4 bg-orange-500 hover:bg-orange-600">HIGH</Badge>}
-                      {conv.topicLabel && <Badge variant="secondary" className="text-[10px] h-4">{conv.topicLabel}</Badge>}
-                    </div>
+                    {(conv.priority === 'urgent' || conv.priority === 'high') && (
+                      <div className="flex items-center gap-1">
+                        {conv.priority === 'urgent' && <Badge variant="destructive" className="text-[10px] h-4 px-1.5">URGENT</Badge>}
+                        {conv.priority === 'high' && <Badge className="text-[10px] h-4 px-1.5 bg-orange-500 hover:bg-orange-600">HIGH</Badge>}
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -86,7 +171,7 @@ export default function Inbox() {
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
               <MessageSquare className="w-16 h-16 mb-4 opacity-20" />
-              <p>Select a conversation to view</p>
+              <p className="text-sm">Select a conversation to view</p>
             </div>
           )}
         </ResizablePanel>

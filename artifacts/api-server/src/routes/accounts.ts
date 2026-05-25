@@ -13,6 +13,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth } from "../middleware/auth";
 import { logger } from "../lib/logger";
+import { syncAccount } from "../lib/unipile-sync";
 
 const router: IRouter = Router();
 
@@ -165,6 +166,21 @@ router.post("/accounts/confirm", requireAuth, async (req: Request, res: Response
       });
     }
 
+    // Kick off background sync so inbox populates right away
+    const confirmedId = existing[0]?.id ?? `acc_${Date.now()}_tmp`;
+    // Re-fetch to get the actual inserted ID
+    const fresh = await db
+      .select()
+      .from(connectedAccountsTable)
+      .where(eq(connectedAccountsTable.unipileAccountId, unipileAccountId))
+      .limit(1);
+
+    if (fresh[0]) {
+      syncAccount(fresh[0].id, user.id).catch((err) => {
+        logger.warn({ err }, "Background sync after confirm failed");
+      });
+    }
+
     res.json({ status: "ok" });
   } catch (err) {
     req.log.error({ err }, "Account confirm error");
@@ -198,12 +214,18 @@ router.post("/accounts/:id/sync", requireAuth, async (req: Request, res: Respons
     return;
   }
 
-  await db
-    .update(connectedAccountsTable)
-    .set({ status: "syncing" })
-    .where(eq(connectedAccountsTable.id, rawId));
+  const jobId = `sync_${rawId}_${Date.now()}`;
 
-  res.json(TriggerSyncResponse.parse({ jobId: `sync_${rawId}_${Date.now()}`, status: "queued" }));
+  // Run sync in background — respond immediately so the UI isn't blocked
+  syncAccount(rawId, user.id)
+    .then(({ synced, platform }) => {
+      logger.info({ jobId, synced, platform }, "Sync job completed");
+    })
+    .catch((err) => {
+      logger.error({ err, jobId }, "Sync job failed");
+    });
+
+  res.json(TriggerSyncResponse.parse({ jobId, status: "queued" }));
 });
 
 export default router;
