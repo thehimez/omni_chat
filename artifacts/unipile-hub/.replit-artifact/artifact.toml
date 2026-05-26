@@ -1,0 +1,31 @@
+kind = "data-app"
+previewPath = "/"
+title = "Unipile Messaging Hub"
+version = "1.0.0"
+id = "artifacts/unipile-hub"
+router = "path"
+
+[[integratedSkills]]
+name = "data-visualization"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21706
+
+[services.development]
+run = "pnpm --filter @workspace/unipile-hub run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/unipile-hub", "run", "build" ]
+publicDir = "artifacts/unipile-hub/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21706"
+BASE_PATH = "/"
