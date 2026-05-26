@@ -66,50 +66,73 @@ router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<voi
 //                    account_credentials | account_permissions
 // Legacy fallbacks:  account_connected | message_received (older Unipile versions)
 
+// ─── Unipile payload shape (actual format from their API) ────────────────────
+// Unipile sends message fields at the TOP LEVEL — not nested under "data".
+// Key fields for message_received:
+//   provider_chat_id  → conversation external ID
+//   message           → message body text
+//   message_id        → external message ID
+//   sender.attendee_name / sender.attendee_public_identifier → sender display
+//   timestamp         → ISO datetime
+//   is_sender         → true if WE sent it (skip those)
+//   provider          → inside sender.attendee_specifics.provider (e.g. "WHATSAPP")
+//   account_id        → top-level, which Unipile account received the message
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PROVIDER_MAP: Record<string, string> = {
+  GOOGLE: "gmail", OUTLOOK: "outlook", WHATSAPP: "whatsapp",
+  LINKEDIN: "linkedin", INSTAGRAM: "instagram", TELEGRAM: "telegram",
+  MESSENGER: "messenger", TWITTER: "twitter",
+};
+
+function normalisePlatform(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  return PROVIDER_MAP[raw.toUpperCase()] ?? raw.toLowerCase();
+}
+
 router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<void> => {
   try {
-    const payload = req.body as {
-      event?: string;
-      account_id?: string;
-      data?: {
-        id?: string;
-        chat_id?: string;
-        thread_id?: string;
-        text?: string;
-        body?: string;
-        sender?: { name?: string; display_name?: string; id?: string };
-        from?: { name?: string; display_name?: string };
-        provider?: string;
-        date?: string;
-        timestamp?: string;
-      };
-    };
+    // Unipile sends a flat payload — all fields at top level
+    const payload = req.body as Record<string, any>;
 
-    const event = payload.event ?? "unknown";
-    const accountId = payload.account_id ?? null;
-    const data = payload.data;
-    const provider = data?.provider ?? null;
+    const event: string = payload.event ?? "unknown";
+    const accountId: string | null = payload.account_id ?? null;
+
+    // Provider can live in multiple places depending on event type
+    const provider: string | null =
+      payload.provider ??
+      payload.data?.provider ??
+      payload.sender?.attendee_specifics?.provider ??
+      null;
 
     logger.info({ event, accountId, provider }, "Unipile webhook received");
 
-    // ── Build human-readable summary for the event log ──────────────────────
+    // ── Build human-readable summary ─────────────────────────────────────────
+    const senderDisplay: string =
+      payload.sender?.attendee_name ??
+      payload.sender?.attendee_public_identifier ??
+      payload.data?.sender?.name ??
+      payload.data?.from?.name ??
+      "";
+
+    const messagePreview: string = (
+      payload.message ??
+      payload.data?.text ??
+      payload.data?.body ??
+      ""
+    ).slice(0, 60);
+
     let summary = event;
     if (provider) summary += ` (${provider})`;
-    if (data?.sender?.name || data?.sender?.display_name || data?.from?.name) {
-      summary += ` from ${data.sender?.name ?? data.sender?.display_name ?? data.from?.name}`;
-    }
-    if (data?.text || data?.body) {
-      const preview = (data.text ?? data.body ?? "").slice(0, 60);
-      if (preview) summary += `: "${preview}"`;
-    }
+    if (senderDisplay) summary += ` from ${senderDisplay}`;
+    if (messagePreview) summary += `: "${messagePreview}"`;
 
-    // Store in in-memory event log for the Admin panel
     appendWebhookEvent({ event, accountId, provider, summary, raw: payload });
 
-    // ── Account events ───────────────────────────────────────────────────────
+    // ── Account status events ─────────────────────────────────────────────────
     const isAccountConnected =
       event === "account_creation_success" ||
-      event === "account_connected" ||       // legacy
+      event === "account_connected" ||
       event === "account_reconnected" ||
       event === "account_sync_success";
 
@@ -139,134 +162,165 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
           })
           .where(eq(connectedAccountsTable.id, accounts[0].id));
       } else if (event === "account_creation_success") {
-        // First-time connection: insert a new row
-        // `name` field in Unipile payload carries the userId we passed during hosted auth
-        const userId = (payload as any).name ?? (payload as any).data?.name ?? null;
-        const platformFromProvider = provider
-          ? Object.entries({
-              GOOGLE: "gmail", OUTLOOK: "outlook", WHATSAPP: "whatsapp",
-              LINKEDIN: "linkedin", INSTAGRAM: "instagram", TELEGRAM: "telegram",
-              MESSENGER: "messenger", TWITTER: "twitter",
-            }).find(([k]) => k === provider)?.[1] ?? provider.toLowerCase()
-          : "unknown";
-
+        const userId = payload.name ?? payload.data?.name ?? null;
+        const platform = normalisePlatform(provider) ?? "unknown";
         if (userId) {
           await db.insert(connectedAccountsTable).values({
             id: `acc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
             userId,
-            platform: platformFromProvider,
-            accountLabel: platformFromProvider.charAt(0).toUpperCase() + platformFromProvider.slice(1),
+            platform,
+            accountLabel: platform.charAt(0).toUpperCase() + platform.slice(1),
             unipileAccountId: accountId,
             status: "connected",
             lastSyncAt: new Date(),
             messageCount: 0,
           }).onConflictDoNothing();
-          logger.info({ userId, platform: platformFromProvider, accountId }, "New account registered via webhook");
-        } else {
-          logger.warn({ accountId, provider }, "account_creation_success webhook missing userId (name field)");
+          logger.info({ userId, platform, accountId }, "New account registered via webhook");
         }
       }
     }
 
-    // ── Incoming message events ──────────────────────────────────────────────
+    // ── Incoming message events ───────────────────────────────────────────────
     const isNewMessage =
       event === "new_message" ||
-      event === "message_received";   // legacy
+      event === "message_received";
 
-    if (isNewMessage && data) {
-      const chatId = data.chat_id ?? data.thread_id;
+    if (isNewMessage) {
+      // Skip messages WE sent — is_sender=true means outbound
+      if (payload.is_sender === true) {
+        res.json(UnipileWebhookResponse.parse({ status: "ok" }));
+        return;
+      }
+
+      // ── Extract fields from real Unipile flat payload ─────────────────────
+      // Primary format: fields at top level (message_received from Unipile dashboard)
+      // Fallback format: nested under data (older/custom integrations)
+      const chatId: string | null =
+        payload.provider_chat_id ??        // real Unipile format
+        payload.data?.chat_id ??
+        payload.data?.thread_id ??
+        null;
+
+      const rawText: string =
+        payload.message ??                 // real Unipile format
+        payload.data?.text ??
+        payload.data?.body ??
+        "";
+
+      const externalMsgId: string | null =
+        payload.message_id ??             // real Unipile format
+        payload.data?.id ??
+        null;
+
+      const sentAtRaw: string | null =
+        payload.timestamp ??              // real Unipile format
+        payload.data?.date ??
+        payload.data?.timestamp ??
+        null;
+
+      const senderName: string =
+        payload.sender?.attendee_name ??
+        payload.sender?.attendee_public_identifier ??
+        payload.data?.sender?.name ??
+        payload.data?.sender?.display_name ??
+        payload.data?.from?.name ??
+        "Unknown";
+
+      // Derive platform: sender specifics > top-level provider > account lookup
+      const rawProvider: string | null =
+        payload.sender?.attendee_specifics?.provider ??
+        provider;
+      const platform = normalisePlatform(rawProvider);
+
       if (!chatId) {
-        logger.warn({ event }, "new_message webhook missing chat_id");
-      } else {
-        // Normalize text: strip WhatsApp LID tokens like {{153790028214398@lid}}
-        const rawText = data.text ?? data.body ?? "";
-        const bodyText = rawText
-          .replace(/\{\{[^}]+\}\}\s*/g, "")
-          .replace(/\s+/g, " ")
-          .trim();
-        const headline = bodyText.slice(0, 120) || null;
+        logger.warn({ event, payload: JSON.stringify(payload).slice(0, 200) }, "Unipile webhook missing chat ID");
+        res.json(UnipileWebhookResponse.parse({ status: "ok" }));
+        return;
+      }
 
-        const senderName =
-          data.sender?.name ?? data.sender?.display_name ??
-          data.from?.name ?? data.from?.display_name ?? "Unknown";
-        const sentAt = data.date ?? data.timestamp;
+      // Normalise text — strip WhatsApp LID tokens {{xxx@lid}}
+      const bodyText = rawText
+        .replace(/\{\{[^}]+\}\}\s*/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      const headline = bodyText.slice(0, 120) || null;
+      const sentAt = sentAtRaw ? new Date(sentAtRaw) : new Date();
 
-        const existing = await db
+      // ── Look up existing conversation ─────────────────────────────────────
+      const existing = await db
+        .select()
+        .from(conversationsTable)
+        .where(eq(conversationsTable.externalId, chatId))
+        .limit(1);
+
+      if (existing[0]) {
+        // Conversation known — insert message and broadcast
+        const msgId = `msg_${externalMsgId ?? Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+        await db.insert(messagesTable).values({
+          id: msgId,
+          conversationId: existing[0].id,
+          userId: existing[0].userId,
+          platform: platform ?? existing[0].platform,
+          externalId: externalMsgId,
+          direction: "inbound",
+          bodyText: bodyText || "(Media)",
+          senderName,
+          isRead: false,
+          sentAt,
+        }).onConflictDoNothing();
+
+        await db
+          .update(conversationsTable)
+          .set({
+            ...(headline ? { headline } : {}),
+            lastMessageAt: sentAt,
+            unreadCount: existing[0].unreadCount + 1,
+            isRead: false,
+          })
+          .where(eq(conversationsTable.id, existing[0].id));
+
+        broadcastToUser(existing[0].userId, "new_message", {
+          conversationId: existing[0].id,
+          senderName,
+          preview: bodyText.slice(0, 80) || "(Media)",
+          platform: platform ?? existing[0].platform,
+        });
+
+        logger.info(
+          { conversationId: existing[0].id, userId: existing[0].userId, chatId },
+          "new_message: saved & broadcast to SSE",
+        );
+      } else if (accountId) {
+        // Unknown conversation — look up account and pull the chat from Unipile
+        const account = await db
           .select()
-          .from(conversationsTable)
-          .where(eq(conversationsTable.externalId, chatId))
+          .from(connectedAccountsTable)
+          .where(eq(connectedAccountsTable.unipileAccountId, accountId))
           .limit(1);
 
-        if (existing[0]) {
-          const msgId = `msg_${data.id ?? Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        if (account[0]) {
+          const resolvedPlatform = platform ?? account[0].platform;
 
-          await db.insert(messagesTable).values({
-            id: msgId,
-            conversationId: existing[0].id,
-            userId: existing[0].userId,
-            platform: provider ?? existing[0].platform,
-            externalId: data.id,
-            direction: "inbound",
-            bodyText: bodyText || "(Media)",
-            senderName,
-            isRead: false,
-            sentAt: sentAt ? new Date(sentAt) : new Date(),
-          }).onConflictDoNothing();
+          const convId = await syncChatById(
+            chatId,
+            accountId,
+            account[0].id,
+            account[0].userId,
+            resolvedPlatform,
+          );
 
-          await db
-            .update(conversationsTable)
-            .set({
-              ...(headline ? { headline } : {}),
-              lastMessageAt: new Date(),
-              unreadCount: existing[0].unreadCount + 1,
-              isRead: false,
-            })
-            .where(eq(conversationsTable.id, existing[0].id));
-
-          broadcastToUser(existing[0].userId, "new_message", {
-            conversationId: existing[0].id,
-            senderName,
-            preview: bodyText.slice(0, 80),
-            platform: provider ?? existing[0].platform,
-          });
-
-          logger.info({ conversationId: existing[0].id, userId: existing[0].userId }, "Broadcast new_message to SSE clients");
-        } else if (accountId) {
-          // Conversation not in DB yet — look up account and do incremental sync
-          const account = await db
-            .select()
-            .from(connectedAccountsTable)
-            .where(eq(connectedAccountsTable.unipileAccountId, accountId))
-            .limit(1);
-
-          if (account[0]) {
-            const platformFromProvider = provider
-              ? Object.entries({
-                  GOOGLE: "gmail", OUTLOOK: "outlook", WHATSAPP: "whatsapp",
-                  LINKEDIN: "linkedin", INSTAGRAM: "instagram", TELEGRAM: "telegram",
-                }).find(([k]) => k === provider)?.[1] ?? provider.toLowerCase()
-              : account[0].platform;
-
-            const convId = await syncChatById(
-              chatId,
-              accountId,
-              account[0].id,
-              account[0].userId,
-              platformFromProvider,
-            );
-
-            if (convId) {
-              broadcastToUser(account[0].userId, "new_message", {
-                conversationId: convId,
-                senderName,
-                preview: bodyText.slice(0, 80),
-                platform: platformFromProvider,
-              });
-              logger.info({ convId, chatId }, "New conversation created from webhook and broadcast");
-            }
-          } else {
-            logger.warn({ chatId, accountId }, "new_message webhook: no matching account in DB");
+          if (convId) {
+            broadcastToUser(account[0].userId, "new_message", {
+              conversationId: convId,
+              senderName,
+              preview: bodyText.slice(0, 80) || "(Media)",
+              platform: resolvedPlatform,
+            });
+            logger.info({ convId, chatId }, "new_message: new conversation synced & broadcast");
           }
+        } else {
+          logger.warn({ chatId, accountId }, "new_message: no matching account in DB for this accountId");
         }
       }
     }
