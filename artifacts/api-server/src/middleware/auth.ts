@@ -85,6 +85,12 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  // In demo mode (no Clerk configured), skip admin auth entirely
+  if (!process.env.CLERK_SECRET_KEY) {
+    next();
+    return;
+  }
+
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     res.status(401).json({ error: "Unauthorized" });

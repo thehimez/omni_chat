@@ -137,8 +137,15 @@ function WebhookEventLog({ adminToken }: { adminToken: string }) {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
+// In dev/demo mode (no Clerk configured) skip the login gate entirely
+const IS_DEV_MODE = import.meta.env.DEV && !import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
 export default function Admin() {
   const [token, setToken] = useState(localStorage.getItem("adminToken") || "");
+
+  if (IS_DEV_MODE) {
+    return <AdminDashboard token="dev-token" onLogout={() => {}} />;
+  }
 
   if (!token) {
     return <AdminLogin setToken={(t) => {

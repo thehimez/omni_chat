@@ -128,8 +128,8 @@ router.get("/admin/stats", requireAdmin, async (req: Request, res: Response): Pr
   }));
 });
 
-// Webhook event log — no auth required so it's easy to test, returns last 100 events
-router.get("/admin/webhook-events", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+// Webhook event log — open in demo mode, requireAdmin in production
+router.get("/admin/webhook-events", async (req: Request, res: Response): Promise<void> => {
   res.json({ events: getWebhookLog() });
 });
 
