@@ -1,0 +1,252 @@
+The realtime live-sync architecture is now working MUCH better.
+
+Great progress:
+- new messages now appear instantly
+- realtime chat updates work
+- webhook pipeline is active
+- inbox updates live
+- no manual refresh required anymore
+
+However, a NEW CRITICAL BUG has appeared:
+
+==================================================
+DUPLICATE MESSAGE PROCESSING BUG
+==================================================
+
+Current issue:
+Every incoming WhatsApp message is being processed TWICE.
+
+EXAMPLE:
+I sent:
+1. "Hi"
+2. "Ok"
+
+Expected:
+- each message appears ONCE
+- one webhook event per message
+- one DB record per message
+- one chat bubble per message
+
+ACTUAL RESULT:
+- webhook receives BOTH messages TWICE
+- admin panel logs duplicate webhook events
+- UI renders duplicate messages
+- chat screen shows duplicate bubbles
+
+Example:
+"Hi"
+"Hi"
+
+"Ok"
+"Ok"
+
+This is a CRITICAL architecture issue.
+
+I am sharing screenshots proving:
+- duplicate webhook events
+- duplicate UI rendering
+- duplicate chat persistence
+
+==================================================
+YOU MUST FIND THE ROOT CAUSE
+==================================================
+
+Investigate ALL of these carefully:
+
+1. Is Unipile sending duplicate webhook events?
+2. Is the webhook endpoint being registered twice?
+3. Is the same webhook handler mounted twice?
+4. Is React Strict Mode causing duplicate processing?
+5. Is the frontend subscribing twice to SSE/WebSocket?
+6. Is the backend broadcasting events twice?
+7. Is the sync worker processing same event twice?
+8. Is the DB insert missing idempotency?
+9. Is message deduplication missing?
+10. Is there both:
+   - webhook processing
+   AND
+   - incremental sync processing
+   inserting the same message?
+
+==================================================
+MOST LIKELY ROOT CAUSE
+==================================================
+
+This is VERY likely one of these:
+
+A)
+Webhook event received
+AND
+incremental sync fetch also inserts same message
+
+OR
+
+B)
+React realtime subscription mounted twice
+
+OR
+
+C)
+Webhook retries are being treated as new messages
+
+OR
+
+D)
+No deduplication based on provider message ID
+
+==================================================
+REQUIRED FIX
+==================================================
+
+Implement PROPER IDEMPOTENT MESSAGE PROCESSING.
+
+==================================================
+PHASE 1 — MESSAGE DEDUPLICATION
+==================================================
+
+Every message MUST have a unique provider-level identity.
+
+Use:
+- provider message ID
+- external_message_id
+- webhook event ID
+- Unipile message identifier
+
+Create strict deduplication logic.
+
+Before inserting:
+- check if message already exists
+- ignore duplicates safely
+
+==================================================
+PHASE 2 — DATABASE CONSTRAINTS
+==================================================
+
+Add proper UNIQUE constraints.
+
+Examples:
+- unique(provider_message_id)
+- unique(account_id + provider_message_id)
+
+Use:
+- UPSERT
+- onConflictDoNothing
+- onConflictDoUpdate
+
+NOT raw inserts.
+
+==================================================
+PHASE 3 — WEBHOOK IDEMPOTENCY
+==================================================
+
+Webhook processing MUST become retry-safe.
+
+Requirements:
+- same webhook can arrive multiple times
+- system must process ONLY ONCE
+- retries must NOT create duplicate UI messages
+
+Store:
+- processed webhook event IDs
+- processing timestamps
+
+Ignore already-processed events.
+
+==================================================
+PHASE 4 — PREVENT DOUBLE PROCESSING
+==================================================
+
+Investigate whether BOTH are running:
+1. realtime webhook insertion
+2. incremental sync insertion
+
+If BOTH exist:
+- unify pipeline
+- ensure one source-of-truth
+- prevent duplicate writes
+
+==================================================
+PHASE 5 — SSE / WEBSOCKET DUPLICATION
+==================================================
+
+Investigate:
+- duplicate subscriptions
+- duplicate event listeners
+- duplicate cache mutations
+- multiple mounted providers
+
+Ensure:
+- one realtime connection only
+- one broadcast only
+- one UI mutation only
+
+==================================================
+PHASE 6 — REACT STRICT MODE INVESTIGATION
+==================================================
+
+Check whether development mode causes:
+- useEffect running twice
+- duplicate subscriptions
+- duplicate mutations
+
+If so:
+- cleanup subscriptions properly
+- fix effect teardown
+- prevent double event registration
+
+==================================================
+PHASE 7 — LOGGING & DIAGNOSTICS
+==================================================
+
+Add temporary structured logging:
+
+For EACH incoming event log:
+- provider
+- webhook event ID
+- provider message ID
+- conversation ID
+- insertion source:
+  - webhook
+  - sync
+  - realtime
+- dedupe decision
+
+This will expose EXACTLY where duplication happens.
+
+==================================================
+EXPECTED FINAL RESULT
+==================================================
+
+When I send:
+"Hi"
+"Ok"
+
+The system should:
+- receive ONE event each
+- insert ONE DB row each
+- render ONE chat bubble each
+- broadcast ONE realtime update each
+
+NO duplicates anywhere.
+
+==================================================
+IMPORTANT
+==================================================
+
+Do NOT patch this superficially.
+
+This is a core realtime architecture + idempotency problem.
+
+The system must become:
+- idempotent
+- retry-safe
+- deduplicated
+- production-grade
+
+Exactly like:
+- WhatsApp
+- Slack
+- Discord
+- Messenger
+
+Use proper provider-level deduplication architecture.

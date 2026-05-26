@@ -192,6 +192,25 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
         return;
       }
 
+      // ── Guard: only process webhooks from accounts we know about ──────────
+      // Unipile sends every webhook TWICE — once per internal account ID.
+      // One is the real account (in our connectedAccounts table), the other
+      // is their internal mirror account (not in our DB). Dropping the mirror
+      // here prevents duplicate DB writes and duplicate SSE broadcasts.
+      if (accountId) {
+        const knownAccount = await db
+          .select({ id: connectedAccountsTable.id })
+          .from(connectedAccountsTable)
+          .where(eq(connectedAccountsTable.unipileAccountId, accountId))
+          .limit(1);
+
+        if (!knownAccount[0]) {
+          logger.debug({ accountId }, "Skipping webhook from unknown Unipile account (mirror)");
+          res.json(UnipileWebhookResponse.parse({ status: "ok" }));
+          return;
+        }
+      }
+
       // ── Extract fields from real Unipile flat payload ─────────────────────
       // Primary format: fields at top level (message_received from Unipile dashboard)
       // Fallback format: nested under data (older/custom integrations)
@@ -265,10 +284,18 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
         .limit(1);
 
       if (existing[0]) {
-        // Conversation known — insert message and broadcast
-        const msgId = `msg_${externalMsgId ?? Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        // ── Deterministic message ID ───────────────────────────────────────
+        // Derive the ID from the provider's message_id so that if the same
+        // webhook arrives a second time (retry, mirror account, etc.) the
+        // INSERT hits a primary-key conflict and onConflictDoNothing skips it.
+        // Random suffix is only used as last resort when message_id is absent.
+        const msgId = externalMsgId
+          ? `msg_whook_${externalMsgId}`
+          : `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
-        await db.insert(messagesTable).values({
+        // Use .returning() to detect whether the row was actually inserted or
+        // was a duplicate (conflict → returns empty array).
+        const inserted = await db.insert(messagesTable).values({
           id: msgId,
           conversationId: existing[0].id,
           userId: existing[0].userId,
@@ -279,29 +306,35 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
           senderName,
           isRead: false,
           sentAt,
-        }).onConflictDoNothing();
+        }).onConflictDoNothing().returning({ id: messagesTable.id });
 
-        await db
-          .update(conversationsTable)
-          .set({
-            ...(headline ? { headline } : {}),
-            lastMessageAt: sentAt,
-            unreadCount: existing[0].unreadCount + 1,
-            isRead: false,
-          })
-          .where(eq(conversationsTable.id, existing[0].id));
+        if (inserted.length === 0) {
+          // Duplicate — already processed this message (mirror account webhook
+          // or Unipile retry). Skip the conversation update and SSE broadcast.
+          logger.debug({ msgId, externalMsgId, chatId }, "Duplicate message webhook ignored");
+        } else {
+          await db
+            .update(conversationsTable)
+            .set({
+              ...(headline ? { headline } : {}),
+              lastMessageAt: sentAt,
+              unreadCount: existing[0].unreadCount + 1,
+              isRead: false,
+            })
+            .where(eq(conversationsTable.id, existing[0].id));
 
-        broadcastToUser(existing[0].userId, "new_message", {
-          conversationId: existing[0].id,
-          senderName,
-          preview: bodyText.slice(0, 80) || "(Media)",
-          platform: platform ?? existing[0].platform,
-        });
+          broadcastToUser(existing[0].userId, "new_message", {
+            conversationId: existing[0].id,
+            senderName,
+            preview: bodyText.slice(0, 80) || "(Media)",
+            platform: platform ?? existing[0].platform,
+          });
 
-        logger.info(
-          { conversationId: existing[0].id, userId: existing[0].userId, chatId },
-          "new_message: saved & broadcast to SSE",
-        );
+          logger.info(
+            { conversationId: existing[0].id, userId: existing[0].userId, chatId, msgId },
+            "new_message: saved & broadcast to SSE",
+          );
+        }
       } else if (accountId) {
         // Unknown conversation — look up account and pull the chat from Unipile
         const account = await db
