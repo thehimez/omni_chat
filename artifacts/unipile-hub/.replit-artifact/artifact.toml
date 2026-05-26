@@ -1,5 +1,5 @@
 kind = "data-app"
-previewPath = "/"
+previewPath = "/hub/"
 title = "Unipile Messaging Hub"
 version = "1.0.0"
 id = "artifacts/unipile-hub"
@@ -11,7 +11,7 @@ version = "1.0.0"
 
 [[services]]
 name = "web"
-paths = [ "/" ]
+paths = [ "/hub/" ]
 localPort = 21706
 
 [services.development]
@@ -28,4 +28,4 @@ to = "/index.html"
 
 [services.env]
 PORT = "21706"
-BASE_PATH = "/"
+BASE_PATH = "/hub/"
