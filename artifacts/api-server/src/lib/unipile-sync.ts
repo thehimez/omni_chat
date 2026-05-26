@@ -119,6 +119,39 @@ function resolveChatName(
 
 // ─── Email sync (Gmail / Outlook) ─────────────────────────────────────────────
 
+type UnipileEmail = {
+  id: string;
+  thread_id?: string;
+  from_attendee?: { display_name?: string | null; identifier?: string | null };
+  to_attendees?: Array<{ display_name?: string | null; identifier?: string | null }>;
+  subject?: string | null;
+  body_plain?: string | null;
+  body?: string | null;
+  date?: string | null;
+  unread?: boolean;
+};
+
+async function fetchEmailsFromFolder(
+  unipileAccountId: string,
+  host: string,
+  apiKey: string,
+  folder?: string,
+): Promise<UnipileEmail[]> {
+  const folderParam = folder ? `&folder=${encodeURIComponent(folder)}` : "";
+  const url = `https://${host}/api/v1/emails?account_id=${unipileAccountId}&limit=50${folderParam}`;
+  try {
+    const resp = await fetch(url, { headers: unipileHeaders(apiKey) });
+    if (!resp.ok) {
+      logger.warn({ status: resp.status, folder }, "Unipile emails fetch failed");
+      return [];
+    }
+    const data = await resp.json() as { items?: UnipileEmail[] };
+    return data.items ?? [];
+  } catch {
+    return [];
+  }
+}
+
 async function syncEmails(
   userId: string,
   accountId: string,
@@ -126,35 +159,24 @@ async function syncEmails(
   host: string,
   apiKey: string,
 ): Promise<number> {
-  const url = `https://${host}/api/v1/emails?account_id=${unipileAccountId}&limit=50`;
-  const resp = await fetch(url, { headers: unipileHeaders(apiKey) });
-  if (!resp.ok) {
-    logger.warn({ status: resp.status }, "Unipile emails fetch failed");
-    return 0;
-  }
+  // Fetch inbox and sent in parallel
+  const [inboxEmails, sentEmails] = await Promise.all([
+    fetchEmailsFromFolder(unipileAccountId, host, apiKey),           // inbox (default)
+    fetchEmailsFromFolder(unipileAccountId, host, apiKey, "SENT"),   // sent folder
+  ]);
 
-  const data = await resp.json() as {
-    items?: Array<{
-      id: string;
-      thread_id?: string;
-      from_attendee?: {
-        display_name?: string | null;
-        identifier?: string | null;
-      };
-      subject?: string | null;
-      body_plain?: string | null;
-      body?: string | null;
-      date?: string | null;
-      unread?: boolean;
-    }>;
-  };
+  // Merge, deduplicate by email id, and tag sent emails
+  type TaggedEmail = UnipileEmail & { _isSent?: boolean };
+  const emailMap = new Map<string, TaggedEmail>();
+  for (const e of inboxEmails) emailMap.set(e.id, e);
+  for (const e of sentEmails)  emailMap.set(e.id, { ...e, _isSent: true });
+  const allEmails = Array.from(emailMap.values());
 
-  const emails = data.items ?? [];
-  if (emails.length === 0) return 0;
+  if (allEmails.length === 0) return 0;
 
   // Group by thread_id
-  const threads = new Map<string, typeof emails>();
-  for (const email of emails) {
+  const threads = new Map<string, TaggedEmail[]>();
+  for (const email of allEmails) {
     const key = email.thread_id ?? email.id;
     if (!threads.has(key)) threads.set(key, []);
     threads.get(key)!.push(email);
@@ -168,10 +190,18 @@ async function syncEmails(
     );
     const latest = threadEmails[threadEmails.length - 1];
 
-    const contactName = extractDisplayName(
-      latest.from_attendee?.display_name,
-      latest.from_attendee?.identifier,
-    );
+    // For threads where the latest message is sent by us, use the recipient as contact name
+    const latestIsSent = (latest as TaggedEmail)._isSent;
+    const contactName = latestIsSent
+      ? extractDisplayName(
+          latest.to_attendees?.[0]?.display_name,
+          latest.to_attendees?.[0]?.identifier,
+        )
+      : extractDisplayName(
+          latest.from_attendee?.display_name,
+          latest.from_attendee?.identifier,
+        );
+
     const subject = latest.subject ?? "(No subject)";
     const rawBody = latest.body_plain ?? (latest.body ? stripHtml(latest.body) : null);
     const headline = truncate(rawBody);
@@ -215,10 +245,14 @@ async function syncEmails(
 
     for (const email of threadEmails) {
       const msgId = `msg_${accountId}_${email.id.slice(-20)}`;
-      const senderName = extractDisplayName(
-        email.from_attendee?.display_name,
-        email.from_attendee?.identifier,
-      );
+      const isSent = (email as TaggedEmail)._isSent ?? false;
+
+      const senderName = isSent
+        ? "Me"
+        : extractDisplayName(
+            email.from_attendee?.display_name,
+            email.from_attendee?.identifier,
+          );
       const bodyText = truncate(email.body_plain ?? email.body, 500) ?? "(No content)";
 
       await db
@@ -229,15 +263,15 @@ async function syncEmails(
           userId,
           platform: "gmail",
           externalId: email.id,
-          direction: "inbound",
+          direction: isSent ? "outbound" : "inbound",
           bodyText,
           senderName,
-          isRead: !(email.unread ?? false),
+          isRead: isSent ? true : !(email.unread ?? false),
           sentAt: email.date ? new Date(email.date) : new Date(),
         })
         .onConflictDoUpdate({
           target: messagesTable.id,
-          set: { bodyText, senderName, isRead: !(email.unread ?? false) },
+          set: { bodyText, senderName, isRead: isSent ? true : !(email.unread ?? false) },
         });
       saved++;
     }
@@ -419,6 +453,37 @@ async function syncChats(
 
 // ─── Single-chat incremental sync (called from webhook for unknown conversations) ──
 
+/**
+ * When the webhook sends a provider/native chat ID (e.g. "918837424644@s.whatsapp.net")
+ * instead of the Unipile internal ID, the direct `/chats/<id>` call returns null.
+ * This helper searches the account's chat list for a matching attendee_public_identifier
+ * and returns the Unipile-internal chat ID.
+ */
+async function resolveInternalChatId(
+  providerChatId: string,
+  unipileAccountId: string,
+  host: string,
+  apiKey: string,
+): Promise<string | null> {
+  try {
+    let cursor: string | undefined;
+    for (let page = 0; page < 5; page++) {
+      const url = `https://${host}/api/v1/chats?account_id=${unipileAccountId}&limit=100${cursor ? `&cursor=${cursor}` : ""}`;
+      const resp = await fetch(url, { headers: unipileHeaders(apiKey) });
+      if (!resp.ok) break;
+      const data = await resp.json() as { items?: UnipileChat[]; cursor?: string };
+      const items = data.items ?? [];
+      const match = items.find((c) => c.attendee_public_identifier === providerChatId);
+      if (match) return match.id;
+      if (!data.cursor || items.length === 0) break;
+      cursor = data.cursor;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 export async function syncChatById(
   externalChatId: string,
   unipileAccountId: string,
@@ -431,15 +496,34 @@ export async function syncChatById(
   if (!apiKey) return null;
 
   try {
-    const [chatResp, attendees, messages] = await Promise.all([
-      fetch(`https://${host}/api/v1/chats/${externalChatId}`, {
-        headers: unipileHeaders(apiKey),
-      }).then((r) => (r.ok ? r.json() : null)),
-      fetchChatAttendees(externalChatId, host, apiKey),
-      fetchRecentMessages(externalChatId, host, apiKey),
-    ]);
+    // Try direct fetch first (works when externalChatId is a Unipile internal ID)
+    let resolvedChatId = externalChatId;
+    let chatResp = await fetch(`https://${host}/api/v1/chats/${externalChatId}`, {
+      headers: unipileHeaders(apiKey),
+    }).then((r) => (r.ok ? r.json() : null));
 
-    if (!chatResp) return null;
+    // If direct fetch failed, the ID is likely a native provider ID
+    // (e.g. "918837424644@s.whatsapp.net"). Search the chat list for a match.
+    if (!chatResp) {
+      const internalId = await resolveInternalChatId(externalChatId, unipileAccountId, host, apiKey);
+      if (internalId) {
+        resolvedChatId = internalId;
+        chatResp = await fetch(`https://${host}/api/v1/chats/${internalId}`, {
+          headers: unipileHeaders(apiKey),
+        }).then((r) => (r.ok ? r.json() : null));
+      }
+    }
+
+    if (!chatResp) {
+      logger.warn({ externalChatId, unipileAccountId }, "syncChatById: chat not found via direct or search");
+      return null;
+    }
+
+    // Fetch attendees + messages using the resolved (internal) chat ID
+    const [attendees, messages] = await Promise.all([
+      fetchChatAttendees(resolvedChatId, host, apiKey),
+      fetchRecentMessages(resolvedChatId, host, apiKey),
+    ]);
 
     const chat = chatResp as UnipileChat;
     const isGroup = (chat.type ?? 0) > 0;
@@ -456,10 +540,11 @@ export async function syncChatById(
     const headline = truncate(latestMsg?.text ?? latestMsg?.body);
     const other = attendees.find((a) => !a.is_self);
     const avatarUrl = (other as any)?.picture_url ?? null;
-    const convId = `conv_${accountDbId}_${externalChatId.slice(-16)}`;
+    // Use resolvedChatId (Unipile internal ID) for convId — this prevents a
+    // bad ID like "918837424644@s.whatsapp.net" from becoming the convId suffix.
+    const convId = `conv_${accountDbId}_${resolvedChatId.slice(-16)}`;
     const lastAt = chat.last_message_date ?? chat.timestamp ?? new Date().toISOString();
-
-    const providerChatId = chat.attendee_public_identifier ?? null;
+    const providerChatId = chat.attendee_public_identifier ?? externalChatId;
 
     await db
       .insert(conversationsTable)
@@ -467,7 +552,7 @@ export async function syncChatById(
         id: convId,
         userId,
         platform,
-        externalId: externalChatId,
+        externalId: resolvedChatId,
         providerChatId,
         contactName,
         headline,

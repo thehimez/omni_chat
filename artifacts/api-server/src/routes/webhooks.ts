@@ -95,14 +95,32 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
     // Unipile sends a flat payload — all fields at top level
     const payload = req.body as Record<string, any>;
 
-    const event: string = payload.event ?? "unknown";
-    const accountId: string | null = payload.account_id ?? null;
+    // ── Normalise AccountStatus wrapper ─────────────────────────────────────
+    // Some Unipile events arrive as { AccountStatus: { account_id, message, account_type } }
+    // instead of the standard { event, account_id } flat shape. Detect and unwrap.
+    const accountStatusPayload = payload.AccountStatus as
+      | { account_id?: string; message?: string; account_type?: string }
+      | undefined;
+
+    const event: string =
+      payload.event ??
+      (accountStatusPayload
+        ? `account_status_${(accountStatusPayload.message ?? "unknown").toLowerCase()}`
+        : "unknown");
+
+    const accountId: string | null =
+      payload.account_id ??
+      accountStatusPayload?.account_id ??
+      null;
 
     // Provider can live in multiple places depending on event type
     const provider: string | null =
       payload.provider ??
       payload.data?.provider ??
       payload.sender?.attendee_specifics?.provider ??
+      (accountStatusPayload?.account_type
+        ? normalisePlatform(accountStatusPayload.account_type)
+        : null) ??
       null;
 
     logger.info({ event, accountId, provider }, "Unipile webhook received");

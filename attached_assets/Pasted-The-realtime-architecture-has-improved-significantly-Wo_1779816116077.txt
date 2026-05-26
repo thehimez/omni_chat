@@ -1,0 +1,357 @@
+The realtime architecture has improved significantly.
+
+Working correctly now:
+- realtime incoming messages
+- realtime outgoing messages
+- WhatsApp Web sync
+- mobile WhatsApp sync
+- duplicate prevention
+- live chat rendering
+- live inbox reordering
+
+Excellent progress.
+
+However, there is now another MAJOR synchronization gap involving NEW conversations and cross-platform outbound message creation.
+
+==================================================
+CURRENT CRITICAL ISSUE
+==================================================
+
+EXISTING conversations work correctly.
+
+BUT:
+when I send a message to:
+- a NEW WhatsApp number
+- OR a NEW email address
+- OR a conversation that does not already exist in Unified Inbox
+
+the system FAILS to properly create/show the conversation.
+
+==================================================
+WHATSAPP ISSUE
+==================================================
+
+CASE:
+I messaged my dad after a very long time.
+
+Messages sent:
+- "."
+- "new message testing"
+- "new message testing"
+
+RESULTS:
+- messages successfully delivered in WhatsApp
+- visible in WhatsApp Web
+- webhook/admin panel receives some events
+- SOME backend processing is happening
+
+BUT:
+the conversation NEVER appears in Unified Inbox.
+
+This means:
+- outbound message events exist
+- BUT conversation creation/upsert fails
+
+==================================================
+EMAIL ISSUE
+==================================================
+
+I sent emails to:
+hello@himeshbhaumik.xyz
+
+Emails were:
+- successfully sent
+- visible in Gmail Sent folder
+- delivered successfully
+
+BUT:
+- NO webhook appears
+- NO inbox conversation appears
+- NO sent thread appears
+- NOTHING visible in Unified Inbox
+
+This is a MAJOR Gmail outbound sync gap.
+
+==================================================
+UNKNOWN EVENTS ISSUE
+==================================================
+
+In Admin Panel:
+multiple UNKNOWN events are appearing.
+
+Examples attached in screenshots.
+
+These unknown events may be:
+- undocumented Unipile events
+- account lifecycle events
+- status events
+- connection events
+- unsupported webhook payloads
+- parsing failures
+
+Currently:
+they are not normalized properly.
+
+This is dangerous because:
+important provider events may silently fail.
+
+==================================================
+I AM SHARING SCREENSHOTS AS PROOF
+==================================================
+
+The screenshots clearly show:
+1. WhatsApp messages successfully sent
+2. Gmail sent emails successfully delivered
+3. Admin panel receives partial events
+4. Unified Inbox missing new conversations
+5. Unknown webhook payloads appearing
+
+==================================================
+THIS IS THE REAL ROOT ISSUE
+==================================================
+
+The system currently handles:
+- updates to EXISTING conversations
+
+BUT FAILS at:
+- automatic conversation/thread creation
+- outbound thread initialization
+- first-message synchronization
+- outbound Gmail sync
+- new-contact discovery
+
+==================================================
+YOU MUST INVESTIGATE ALL OF THESE
+==================================================
+
+1. Does outbound messaging create conversations?
+2. Does Unipile emit different events for new conversations?
+3. Are outbound-only conversations ignored?
+4. Is conversation upsert logic inbound-only?
+5. Does Gmail require polling/history sync for sent mail?
+6. Are sent emails excluded from sync filters?
+7. Is the system only syncing inbox folder?
+8. Is conversation creation dependent on incoming messages?
+9. Are webhook event types partially unsupported?
+10. Are unknown events causing silent failures?
+
+==================================================
+MOST LIKELY ROOT CAUSES
+==================================================
+
+WHATSAPP:
+Likely:
+- outbound messages processed
+- BUT no conversation auto-creation logic exists
+
+OR:
+- conversation only created on inbound event
+
+==================================================
+
+GMAIL:
+Likely:
+- only inbox emails synced
+- sent folder ignored
+- webhook subscription incomplete
+- Gmail history/watch API not configured fully
+- outbound sent threads excluded
+
+==================================================
+
+UNKNOWN EVENTS:
+Likely:
+- webhook parser incomplete
+- unsupported event normalization
+- missing event registry
+- unknown payload fallback missing
+
+==================================================
+REQUIRED FIX
+==================================================
+
+==================================================
+PHASE 1 — AUTO CREATE CONVERSATIONS
+==================================================
+
+When ANY outbound message occurs:
+- WhatsApp
+- Gmail
+- LinkedIn
+
+the system MUST:
+1. create conversation if missing
+2. insert initial message
+3. create preview
+4. update inbox ordering
+5. render instantly in UI
+
+Exactly like WhatsApp/Gmail.
+
+==================================================
+PHASE 2 — OUTBOUND-ONLY CONVERSATION SUPPORT
+==================================================
+
+Conversations MUST exist even if:
+- no reply yet
+- outbound-only
+- first contact initiated by me
+
+The app must support:
+- cold outreach
+- first-time messaging
+- outbound sales
+- outbound emails
+
+==================================================
+PHASE 3 — GMAIL SENT FOLDER SYNC
+==================================================
+
+Investigate official Unipile Gmail sync architecture.
+
+Verify:
+- Sent folder synchronization
+- outbound email events
+- thread creation
+- history/watch subscriptions
+- webhook coverage
+
+The Unified Inbox MUST include:
+- sent emails
+- outbound threads
+- self-authored emails
+
+==================================================
+PHASE 4 — CONVERSATION UPSERT ENGINE
+==================================================
+
+Implement robust:
+getOrCreateConversation()
+
+Behavior:
+- if conversation exists → update
+- if not → create automatically
+
+Works for:
+- inbound
+- outbound
+- replies
+- new contacts
+- new threads
+
+==================================================
+PHASE 5 — UNKNOWN EVENT NORMALIZATION
+==================================================
+
+Build resilient webhook event parsing.
+
+For EVERY unknown event:
+1. log raw payload
+2. classify provider
+3. classify event family
+4. store diagnostics
+5. prevent silent failure
+
+Create:
+UnknownEventRegistry
+
+So unsupported events become debuggable.
+
+==================================================
+PHASE 6 — PROVIDER EVENT COVERAGE
+==================================================
+
+Audit ALL Unipile event types.
+
+Especially:
+- WhatsApp
+- Gmail
+- LinkedIn
+
+Ensure ALL important events handled:
+- message_received
+- message_sent
+- message_delivered
+- thread_created
+- account_status
+- sync_state
+- connection updates
+- read receipts
+- reactions
+
+==================================================
+PHASE 7 — GMAIL THREAD ARCHITECTURE
+==================================================
+
+Email is THREAD-based, not message-based.
+
+Ensure:
+- outbound emails create threads
+- replies merge correctly
+- sent folder updates thread
+- unified inbox shows latest thread state
+
+==================================================
+PHASE 8 — VERIFY USING REAL TESTS
+==================================================
+
+Test ALL scenarios:
+
+WHATSAPP:
+- send to new number
+- send to old inactive number
+- send from mobile
+- send from web
+- receive reply
+
+GMAIL:
+- send to new email
+- send reply
+- receive response
+- sent folder sync
+- thread creation
+
+Verify:
+- conversation auto-created
+- visible instantly
+- correct ordering
+- realtime updates
+- proper previews
+
+==================================================
+EXPECTED FINAL RESULT
+==================================================
+
+The Unified Inbox should behave like a REAL communication OS.
+
+ANY interaction:
+- inbound
+- outbound
+- new thread
+- first message
+- email
+- WhatsApp
+
+should instantly create/update the conversation automatically.
+
+NO missing conversations.
+NO outbound gaps.
+NO hidden sent threads.
+
+==================================================
+IMPORTANT
+==================================================
+
+Do NOT patch this superficially.
+
+This is a core:
+- conversation lifecycle
+- outbound thread creation
+- provider synchronization
+- event normalization
+
+architecture issue.
+
+Use official Unipile provider event architecture properly.
+
+Also deeply inspect and resolve the UNKNOWN events instead of ignoring them.
