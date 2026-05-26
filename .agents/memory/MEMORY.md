@@ -1,0 +1,2 @@
+- [Unipile sync architecture](unipile-sync.md) — key patterns for name resolution, message preview, webhook normalization, and incremental sync
+- [Xanda inbox realtime](xanda-realtime.md) — SSE broadcaster pattern, how navigation/optimistic updates work, and the markRead flow

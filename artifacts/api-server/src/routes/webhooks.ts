@@ -5,6 +5,7 @@ import { StripeWebhookResponse, UnipileWebhookResponse } from "@workspace/api-zo
 import { logger } from "../lib/logger";
 import { appendWebhookEvent } from "../lib/webhook-log";
 import { broadcastToUser } from "../lib/sse-broadcaster";
+import { syncChatById } from "../lib/unipile-sync";
 
 const router: IRouter = Router();
 
@@ -177,11 +178,17 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
       if (!chatId) {
         logger.warn({ event }, "new_message webhook missing chat_id");
       } else {
-        const msgId = `msg_${data.id ?? Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        // Normalize text: strip WhatsApp LID tokens like {{153790028214398@lid}}
+        const rawText = data.text ?? data.body ?? "";
+        const bodyText = rawText
+          .replace(/\{\{[^}]+\}\}\s*/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        const headline = bodyText.slice(0, 120) || null;
+
         const senderName =
           data.sender?.name ?? data.sender?.display_name ??
           data.from?.name ?? data.from?.display_name ?? "Unknown";
-        const bodyText = data.text ?? data.body ?? "";
         const sentAt = data.date ?? data.timestamp;
 
         const existing = await db
@@ -191,14 +198,16 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
           .limit(1);
 
         if (existing[0]) {
+          const msgId = `msg_${data.id ?? Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
           await db.insert(messagesTable).values({
             id: msgId,
             conversationId: existing[0].id,
             userId: existing[0].userId,
-            platform: provider ?? "unknown",
+            platform: provider ?? existing[0].platform,
             externalId: data.id,
             direction: "inbound",
-            bodyText,
+            bodyText: bodyText || "(Media)",
             senderName,
             isRead: false,
             sentAt: sentAt ? new Date(sentAt) : new Date(),
@@ -207,7 +216,7 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
           await db
             .update(conversationsTable)
             .set({
-              headline: bodyText.slice(0, 120) || existing[0].headline,
+              ...(headline ? { headline } : {}),
               lastMessageAt: new Date(),
               unreadCount: existing[0].unreadCount + 1,
               isRead: false,
@@ -218,10 +227,46 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
             conversationId: existing[0].id,
             senderName,
             preview: bodyText.slice(0, 80),
-            platform: provider ?? "unknown",
+            platform: provider ?? existing[0].platform,
           });
 
           logger.info({ conversationId: existing[0].id, userId: existing[0].userId }, "Broadcast new_message to SSE clients");
+        } else if (accountId) {
+          // Conversation not in DB yet — look up account and do incremental sync
+          const account = await db
+            .select()
+            .from(connectedAccountsTable)
+            .where(eq(connectedAccountsTable.unipileAccountId, accountId))
+            .limit(1);
+
+          if (account[0]) {
+            const platformFromProvider = provider
+              ? Object.entries({
+                  GOOGLE: "gmail", OUTLOOK: "outlook", WHATSAPP: "whatsapp",
+                  LINKEDIN: "linkedin", INSTAGRAM: "instagram", TELEGRAM: "telegram",
+                }).find(([k]) => k === provider)?.[1] ?? provider.toLowerCase()
+              : account[0].platform;
+
+            const convId = await syncChatById(
+              chatId,
+              accountId,
+              account[0].id,
+              account[0].userId,
+              platformFromProvider,
+            );
+
+            if (convId) {
+              broadcastToUser(account[0].userId, "new_message", {
+                conversationId: convId,
+                senderName,
+                preview: bodyText.slice(0, 80),
+                platform: platformFromProvider,
+              });
+              logger.info({ convId, chatId }, "New conversation created from webhook and broadcast");
+            }
+          } else {
+            logger.warn({ chatId, accountId }, "new_message webhook: no matching account in DB");
+          }
         }
       }
     }

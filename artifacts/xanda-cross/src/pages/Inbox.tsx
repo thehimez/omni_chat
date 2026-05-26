@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation, useSearch } from "wouter";
 import { 
   useGetConversations, 
@@ -16,13 +16,13 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PlatformIcon } from "@/components/platform-icon";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
 import { Bot, Send, RefreshCw, Paperclip, MoreVertical, MessageSquare, Inbox as InboxIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { formatInboxTimestamp } from "@/lib/format-time";
 
 export default function Inbox() {
   const search = useSearch();
@@ -35,6 +35,22 @@ export default function Inbox() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
+
+  const handleSelectConversation = useCallback((convId: string) => {
+    queryClient.setQueryData(
+      getGetConversationsQueryKey(),
+      (old: any) => {
+        if (!old?.conversations) return old;
+        return {
+          ...old,
+          conversations: old.conversations.map((c: any) =>
+            c.id === convId ? { ...c, isRead: true, unreadCount: 0 } : c,
+          ),
+        };
+      },
+    );
+    navigate(`/inbox?id=${convId}`);
+  }, [queryClient, navigate]);
 
   const conversations = conversationsData?.conversations || [];
   const connectedAccounts = accountsData?.accounts?.filter((a) => a.status === "connected" || a.status === "syncing") ?? [];
@@ -127,20 +143,20 @@ export default function Inbox() {
                 {conversations.map((conv) => (
                   <button
                     key={conv.id}
-                    onClick={() => navigate(`/inbox?id=${conv.id}`)}
+                    onClick={() => handleSelectConversation(conv.id)}
                     className={`w-full text-left p-4 hover:bg-accent/50 transition-colors ${selectedId === conv.id ? 'bg-accent' : ''}`}
                   >
                     <div className="flex justify-between items-start mb-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm line-clamp-1">{conv.contactName}</span>
+                        <span className={`text-sm line-clamp-1 ${!conv.isRead && conv.unreadCount > 0 ? 'font-bold' : 'font-semibold'}`}>{conv.contactName}</span>
                         {!conv.isRead && conv.unreadCount > 0 && (
-                          <span className="min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center px-1 shrink-0">
+                          <span className="min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center px-1 shrink-0 font-bold">
                             {conv.unreadCount}
                           </span>
                         )}
                       </div>
-                      <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 ml-2">
-                        {format(new Date(conv.lastMessageAt), 'MMM d')}
+                      <span className={`text-[11px] whitespace-nowrap shrink-0 ml-2 ${!conv.isRead && conv.unreadCount > 0 ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>
+                        {formatInboxTimestamp(conv.lastMessageAt)}
                       </span>
                     </div>
                     
@@ -192,23 +208,15 @@ function ConversationView({ id }: { id: string }) {
   const [draftGenerated, setDraftGenerated] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const markedReadRef = useRef<string | null>(null);
   useEffect(() => {
-    if (conv && markedReadRef.current !== id) {
-      const lastMsg = conv.messages[conv.messages.length - 1];
-      if (lastMsg && !lastMsg.isRead) {
-        markedReadRef.current = id;
-        markRead.mutate({ id }, {
-          onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
-          }
-        });
-      } else if (lastMsg) {
-        markedReadRef.current = id;
-      }
-    }
+    markRead.mutate({ id }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
+      },
+    });
+  // markRead is stable; only re-fire when conversation changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, conv?.messages?.length]);
+  }, [id]);
 
   useEffect(() => {
     if (scrollRef.current) {

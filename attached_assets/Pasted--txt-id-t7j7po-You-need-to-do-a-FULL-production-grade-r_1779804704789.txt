@@ -1,0 +1,365 @@
+```txt id="t7j7po"
+You need to do a FULL production-grade rebuild of the Unified Inbox realtime synchronization, unread handling, sorting logic, timestamp formatting, and inbox ordering system using the official Unipile architecture/documentation.
+
+I am sharing screenshots showing the exact UX problems currently happening.
+
+CURRENT CRITICAL PROBLEMS
+==================================================
+
+1. NEW MESSAGES DO NOT APPEAR AUTOMATICALLY
+--------------------------------------------------
+Even though:
+- new WhatsApp messages arrive
+- new Gmail emails arrive
+- new LinkedIn messages arrive
+
+the Unified Inbox does NOT update automatically.
+
+The latest conversations do NOT move to the top.
+
+The app still shows stale old ordering.
+
+This means:
+- realtime sync is broken
+OR
+- webhook events are not processed correctly
+OR
+- frontend cache invalidation is broken
+OR
+- DB updates are not propagating to UI
+OR
+- inbox ordering query is incorrect
+
+You MUST investigate deeply.
+
+==================================================
+
+2. UNREAD BLUE BADGE DOES NOT CLEAR
+--------------------------------------------------
+
+Current issue:
+- blue unread count badge remains visible
+- even AFTER opening and reading the conversation
+
+Expected behavior:
+- opening a conversation should mark it read
+- unread badge should disappear instantly
+- unread counts should update globally
+- inbox row UI should rerender immediately
+
+Current architecture is likely failing because:
+- local optimistic state missing
+- markRead sync broken
+- frontend cache stale
+- unread source-of-truth inconsistent
+
+You MUST fix this properly.
+
+==================================================
+
+3. LATEST MESSAGE TIME IS MISSING
+--------------------------------------------------
+
+Currently:
+- inbox rows show dates like:
+  "May 26"
+
+This is terrible UX.
+
+We need modern WhatsApp-style timestamp formatting.
+
+REQUIRED TIMESTAMP LOGIC
+==================================================
+
+IF message is TODAY:
+→ show time only
+Example:
+- 7:31 PM
+- 11:02 AM
+
+IF message was YESTERDAY:
+→ show:
+- Yesterday
+
+IF within last 7 days:
+→ show weekday
+Examples:
+- Monday
+- Tuesday
+- Sunday
+
+IF older than 7 days:
+→ show compact date
+Examples:
+- 5 Jan 2026
+- 18 Mar 2025
+
+This MUST be implemented consistently across:
+- WhatsApp
+- Gmail
+- LinkedIn
+
+Exactly like modern messaging apps.
+
+==================================================
+
+4. NEW MESSAGES MUST MOVE TO TOP
+--------------------------------------------------
+
+Current issue:
+New messages are NOT moving conversations to top.
+
+This is one of the most critical messaging UX failures.
+
+Expected behavior:
+- newest activity always appears first
+- same as:
+  - WhatsApp
+  - Gmail
+  - Slack
+  - Discord
+  - Messenger
+
+WHEN:
+- new message arrives
+- new email arrives
+- reaction arrives
+- thread updates
+
+THEN:
+- conversation.updatedAt updates
+- inbox list reorders instantly
+- UI rerenders immediately
+
+==================================================
+
+5. REALTIME SYNC IS CLEARLY BROKEN
+--------------------------------------------------
+
+From screenshots:
+- WhatsApp already has newer messages
+- Gmail already has newer emails
+
+BUT the Unified Inbox still shows old state.
+
+Meaning:
+- Unipile webhook flow incomplete
+- incremental sync broken
+- frontend subscription broken
+- websocket/SSE not propagating updates
+- or DB writes not reflected in React Query cache
+
+You MUST investigate the ENTIRE data pipeline.
+
+==================================================
+FULL IMPLEMENTATION REQUIRED
+==================================================
+
+PHASE 1 — ROOT CAUSE ANALYSIS
+--------------------------------------------------
+
+Investigate ALL of these:
+
+1. How Unipile events are received
+2. Whether webhooks are actually firing
+3. Whether webhook endpoint validates correctly
+4. Whether events are written to DB
+5. Whether conversation.updatedAt updates
+6. Whether latest preview updates
+7. Whether unread counts update
+8. Whether frontend receives realtime events
+9. Whether React Query/SWR cache invalidates
+10. Whether inbox ordering query sorts correctly
+
+==================================================
+
+PHASE 2 — REBUILD INBOX ORDERING SYSTEM
+--------------------------------------------------
+
+Implement production-grade ordering.
+
+RULES:
+- newest activity ALWAYS first
+- sorting based on latest message timestamp
+- inbox rerenders instantly
+- no manual refresh
+- stable ordering under rapid events
+
+DB REQUIREMENTS:
+- indexed updatedAt
+- indexed lastMessageAt
+- efficient ORDER BY DESC
+- no stale cached ordering
+
+==================================================
+
+PHASE 3 — FIX UNREAD ARCHITECTURE
+--------------------------------------------------
+
+Implement correct unread handling.
+
+REQUIRED FLOW:
+1. new message arrives
+2. unread count increments
+3. blue badge appears
+4. user opens conversation
+5. markRead triggers immediately
+6. unread count removed optimistically
+7. backend sync confirms
+8. UI remains consistent
+
+Implement:
+- optimistic updates
+- rollback protection
+- realtime synchronization
+- multi-tab consistency
+
+Fix ALL race conditions.
+
+==================================================
+
+PHASE 4 — IMPLEMENT MODERN TIMESTAMP SYSTEM
+--------------------------------------------------
+
+Create centralized utility:
+
+formatInboxTimestamp()
+
+Behavior:
+
+TODAY:
+- 7:31 PM
+
+YESTERDAY:
+- Yesterday
+
+LAST 7 DAYS:
+- Monday
+
+OLDER:
+- 5 Jan 2026
+
+Use:
+- user timezone
+- locale-safe formatting
+- lightweight utility
+- memoized rendering
+
+==================================================
+
+PHASE 5 — FULL REALTIME WEBHOOK SYSTEM
+--------------------------------------------------
+
+Implement FULL webhook-driven incremental sync.
+
+Use official Unipile webhook documentation.
+
+REQUIREMENTS:
+- WhatsApp realtime updates
+- Gmail realtime updates
+- LinkedIn realtime updates
+
+When new event arrives:
+1. parse webhook
+2. identify account
+3. identify conversation
+4. upsert latest message
+5. update preview
+6. update updatedAt
+7. update unread count
+8. broadcast realtime event
+9. invalidate frontend cache
+10. reorder inbox instantly
+
+==================================================
+
+PHASE 6 — FRONTEND REALTIME LAYER
+--------------------------------------------------
+
+Implement:
+- WebSockets OR SSE
+- realtime cache mutation
+- optimistic UI updates
+- instant inbox rerender
+
+NO page refreshes ever required.
+
+Conversation list must react instantly.
+
+==================================================
+
+PHASE 7 — MESSAGE NORMALIZATION
+--------------------------------------------------
+
+Normalize ALL providers into unified schema.
+
+Especially:
+- WhatsApp reactions
+- Gmail threads
+- LinkedIn messages
+- system events
+
+Reaction messages should NEVER render like:
+
+{{153790028214398@lid}} reacted ❤️
+
+Instead:
+- resolve sender name
+- render proper reaction UI
+- render like WhatsApp
+
+Example:
+"Himanshu reacted ❤️"
+
+OR attach reaction beneath original bubble.
+
+==================================================
+
+PHASE 8 — VERIFY AGAINST REAL APPS
+--------------------------------------------------
+
+Compare behavior directly against:
+- WhatsApp Web
+- Gmail
+- LinkedIn Messaging
+
+Inbox behavior should match:
+- sorting
+- timestamps
+- unread handling
+- realtime updates
+- instant opening
+
+==================================================
+
+IMPORTANT:
+Do NOT implement superficial fixes.
+
+Do NOT rely on manual "Sync All".
+
+The app must become:
+- realtime
+- reactive
+- event-driven
+- production-grade
+
+Use proper architecture.
+
+==================================================
+MOST IMPORTANT REQUIREMENT
+==================================================
+
+I want you to deeply inspect how Unipile handles:
+- webhooks
+- incremental sync
+- realtime updates
+- provider events
+- unread counts
+- thread updates
+
+Then implement the architecture PROPERLY according to Unipile documentation and best practices.
+
+Do not guess.
+
+Use official Unipile event architecture correctly.
+```

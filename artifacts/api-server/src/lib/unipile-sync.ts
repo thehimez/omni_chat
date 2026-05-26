@@ -390,6 +390,109 @@ async function syncChats(
   return saved;
 }
 
+// ─── Single-chat incremental sync (called from webhook for unknown conversations) ──
+
+export async function syncChatById(
+  externalChatId: string,
+  unipileAccountId: string,
+  accountDbId: string,
+  userId: string,
+  platform: string,
+): Promise<string | null> {
+  const apiKey = process.env.UNIPILE_API_KEY;
+  const host = process.env.UNIPILE_DSN ?? "api19.unipile.com:14946";
+  if (!apiKey) return null;
+
+  try {
+    const [chatResp, attendees, messages] = await Promise.all([
+      fetch(`https://${host}/api/v1/chats/${externalChatId}`, {
+        headers: unipileHeaders(apiKey),
+      }).then((r) => (r.ok ? r.json() : null)),
+      fetchChatAttendees(externalChatId, host, apiKey),
+      fetchRecentMessages(externalChatId, host, apiKey),
+    ]);
+
+    if (!chatResp) return null;
+
+    const chat = chatResp as UnipileChat;
+    const isGroup = (chat.type ?? 0) > 0;
+    const contactName = resolveChatName(
+      chat.name,
+      chat.subject,
+      isGroup,
+      attendees,
+      platform,
+      chat.attendee_public_identifier,
+    );
+
+    const latestMsg = messages[0];
+    const headline = truncate(latestMsg?.text ?? latestMsg?.body);
+    const other = attendees.find((a) => !a.is_self);
+    const avatarUrl = (other as any)?.picture_url ?? null;
+    const convId = `conv_${accountDbId}_${externalChatId.slice(-16)}`;
+    const lastAt = chat.last_message_date ?? chat.timestamp ?? new Date().toISOString();
+
+    await db
+      .insert(conversationsTable)
+      .values({
+        id: convId,
+        userId,
+        platform,
+        externalId: externalChatId,
+        contactName,
+        headline,
+        contactAvatarUrl: avatarUrl,
+        priority: "medium",
+        isRead: (chat.unread_count ?? 0) === 0,
+        unreadCount: chat.unread_count ?? 0,
+        lastMessageAt: new Date(lastAt),
+      })
+      .onConflictDoUpdate({
+        target: conversationsTable.id,
+        set: {
+          contactName,
+          headline,
+          contactAvatarUrl: avatarUrl,
+          unreadCount: chat.unread_count ?? 0,
+          isRead: (chat.unread_count ?? 0) === 0,
+          lastMessageAt: new Date(lastAt),
+        },
+      });
+
+    for (const msg of [...messages].reverse()) {
+      const msgId = `msg_${accountDbId}_${msg.id.slice(-20)}`;
+      const bodyText = truncate(msg.text ?? msg.body, 500) ?? "(Media)";
+      const isSender = msg.is_sender === 1 || msg.is_sender === true;
+      const sentAt = msg.date ?? msg.timestamp;
+
+      await db
+        .insert(messagesTable)
+        .values({
+          id: msgId,
+          conversationId: convId,
+          userId,
+          platform,
+          externalId: msg.id,
+          direction: isSender ? "outbound" : "inbound",
+          bodyText,
+          senderName: isSender ? "Me" : contactName,
+          isRead: true,
+          sentAt: sentAt ? new Date(sentAt) : new Date(),
+        })
+        .onConflictDoUpdate({
+          target: messagesTable.id,
+          set: { bodyText },
+        });
+    }
+
+    logger.info({ convId, externalChatId, platform }, "Incremental single-chat sync complete");
+    return convId;
+  } catch (err) {
+    logger.warn({ err, externalChatId }, "syncChatById failed");
+    return null;
+  }
+}
+
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
 export async function syncAccount(
