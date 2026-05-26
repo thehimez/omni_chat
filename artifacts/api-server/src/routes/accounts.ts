@@ -217,15 +217,36 @@ router.post("/accounts/:id/sync", requireAuth, async (req: Request, res: Respons
 
   const jobId = `sync_${rawId}_${Date.now()}`;
 
+  // Tell the UI the sync just kicked off — so the Accounts page can show a
+  // live "syncing" indicator without polling.
+  broadcastToUser(user.id, "account_sync_started", {
+    accountId: rawId,
+    platform: account[0].platform,
+    jobId,
+  });
+
   // Run sync in background — respond immediately so the UI isn't blocked
   syncAccount(rawId, user.id)
     .then(({ synced, platform }) => {
       logger.info({ jobId, synced, platform }, "Sync job completed");
       // Notify all connected SSE clients for this user so the inbox refetches
       broadcastToUser(user.id, "sync_complete", { platform, synced });
+      broadcastToUser(user.id, "account_sync_finished", {
+        accountId: rawId,
+        platform,
+        synced,
+        jobId,
+        status: "success",
+      });
     })
     .catch((err) => {
       logger.error({ err, jobId }, "Sync job failed");
+      broadcastToUser(user.id, "account_sync_finished", {
+        accountId: rawId,
+        platform: account[0].platform,
+        jobId,
+        status: "error",
+      });
     });
 
   res.json(TriggerSyncResponse.parse({ jobId, status: "queued" }));

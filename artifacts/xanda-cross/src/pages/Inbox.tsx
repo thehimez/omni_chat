@@ -30,10 +30,7 @@ export default function Inbox() {
   const [, navigate] = useLocation();
   const selectedId = new URLSearchParams(search).get("id");
 
-  const { data: conversationsData, isLoading: isLoadingList, refetch } = useGetConversations(
-    undefined,
-    { query: { refetchInterval: 15000, staleTime: 0 } },
-  );
+  const { data: conversationsData, isLoading: isLoadingList } = useGetConversations();
   const { data: accountsData } = useGetConnectedAccounts();
   const syncMutation = useTriggerSync();
   const queryClient = useQueryClient();
@@ -62,8 +59,11 @@ export default function Inbox() {
   const handleSyncAll = async () => {
     if (connectedAccounts.length === 0) return;
     setSyncing(true);
-    toast({ title: "Syncing all accounts…", description: "Your messages will appear shortly." });
+    toast({ title: "Syncing all accounts…", description: "Messages will stream in live." });
 
+    // Fire-and-forget: the server emits `conversation_updated` events as each
+    // conversation lands, and `sync_complete` when each account finishes.
+    // The `useRealtime` hook invalidates the inbox cache for us — no polling.
     await Promise.allSettled(
       connectedAccounts.map((acc) =>
         new Promise<void>((resolve) => {
@@ -75,24 +75,7 @@ export default function Inbox() {
       )
     );
 
-    // Poll for conversations appearing — retry up to 6 times with 2s delay
-    let attempts = 0;
-    const poll = setInterval(async () => {
-      attempts++;
-      await queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
-      const result = await queryClient.fetchQuery({ queryKey: getGetConversationsQueryKey() });
-      const count = (result as any)?.conversations?.length ?? 0;
-      if (count > 0 || attempts >= 6) {
-        clearInterval(poll);
-        setSyncing(false);
-        if (count > 0) {
-          toast({ title: `${count} conversations loaded`, description: "Your inbox is ready." });
-        } else {
-          toast({ title: "Sync complete", description: "No conversations found yet — they may take a moment to appear." });
-        }
-        queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
-      }
-    }, 2000);
+    setSyncing(false);
   };
 
   return (

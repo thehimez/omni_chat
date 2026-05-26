@@ -67,6 +67,24 @@ export default defineConfig({
       strict: true,
     },
     proxy: {
+      // SSE endpoint — must NOT be buffered. Configure explicitly so the
+      // event stream is piped through to the browser without the proxy
+      // collecting it into a single response.
+      "/api/events": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        ws: false,
+        configure: (proxy) => {
+          proxy.on("proxyRes", (proxyRes) => {
+            // Force streaming semantics so the dev proxy / Replit iframe
+            // proxy don't try to buffer text/event-stream.
+            delete proxyRes.headers["content-length"];
+            proxyRes.headers["cache-control"] = "no-cache, no-transform";
+            proxyRes.headers["connection"] = "keep-alive";
+            proxyRes.headers["x-accel-buffering"] = "no";
+          });
+        },
+      },
       "/api": {
         target: "http://localhost:8080",
         changeOrigin: true,

@@ -79,6 +79,18 @@ export function useRealtime() {
         queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
       });
 
+      es.addEventListener("account_sync_started", () => {
+        // An account just started syncing — refresh the accounts list so the
+        // "syncing" pill appears without polling.
+        queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
+      });
+
+      es.addEventListener("account_sync_finished", () => {
+        // Sync finished — refresh inbox + accounts.
+        invalidateConversations();
+        queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
+      });
+
       es.addEventListener("account_updated", () => {
         queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
       });

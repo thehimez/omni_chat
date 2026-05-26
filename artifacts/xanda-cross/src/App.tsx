@@ -19,8 +19,11 @@ import NotFound from "@/pages/not-found";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 0,
-      refetchOnWindowFocus: true,
+      // Cache is mutated by SSE events from `useRealtime`. We don't refetch
+      // on focus or interval — anything that would mask a broken event flow.
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
       retry: 1,
     },
   },

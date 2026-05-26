@@ -1,6 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { db, connectedAccountsTable, conversationsTable, messagesTable } from "@workspace/db";
 import { logger } from "./logger";
+import { broadcastToUser } from "./sse-broadcaster";
 
 const EMAIL_PLATFORMS = new Set(["gmail", "outlook"]);
 const CHAT_PLATFORMS = new Set(["whatsapp", "linkedin", "instagram", "telegram", "messenger", "twitter"]);
@@ -203,6 +204,15 @@ async function syncEmails(
         },
       });
 
+    // Stream this conversation to the UI immediately instead of waiting for
+    // the whole sync to finish.
+    broadcastToUser(userId, "conversation_updated", {
+      conversationId: convId,
+      platform: "gmail",
+      contactName,
+      headline,
+    });
+
     for (const email of threadEmails) {
       const msgId = `msg_${accountId}_${email.id.slice(-20)}`;
       const senderName = extractDisplayName(
@@ -356,6 +366,15 @@ async function syncChats(
           lastMessageAt: new Date(lastAt),
         },
       });
+
+    // Stream this conversation to the UI immediately so it appears one-by-one
+    // during a Sync All instead of all-at-once when the job finishes.
+    broadcastToUser(userId, "conversation_updated", {
+      conversationId: convId,
+      platform,
+      contactName,
+      headline,
+    });
 
     // Store messages oldest-first (reverse the newest-first array)
     for (const msg of [...messages].reverse()) {
