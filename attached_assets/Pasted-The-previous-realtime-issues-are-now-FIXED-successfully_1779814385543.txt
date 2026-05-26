@@ -1,0 +1,259 @@
+The previous realtime issues are now FIXED successfully:
+- no more duplicate messages
+- realtime sync works
+- inbox updates instantly
+- sending messages from the app works
+- webhook pipeline is active
+- live UI updates are functioning
+
+Great progress.
+
+However, there is now another CRITICAL synchronization gap.
+
+==================================================
+CURRENT ISSUE
+==================================================
+
+Messages sent FROM MY OWN WHATSAPP ACCOUNT
+(using:
+- mobile WhatsApp
+- WhatsApp Web)
+
+are NOT appearing inside my Unified Inbox app.
+
+IMPORTANT:
+- incoming messages appear correctly
+- messages sent from the app itself appear correctly
+- webhook events are being received
+- admin panel shows the events correctly
+
+BUT:
+messages sent externally from my own WhatsApp client
+(phone or WhatsApp Web)
+do NOT appear in the app UI.
+
+==================================================
+PROOF
+==================================================
+
+In the screenshots:
+
+1. WhatsApp Web shows my sent message:
+"K"
+
+2. Admin panel webhook logs ALSO show:
+message_delivered / message_received events for "K"
+
+3. BUT the Unified Inbox UI does NOT render that sent message.
+
+So:
+- Unipile IS receiving the event
+- webhook pipeline IS receiving the event
+- BUT the message is NOT being inserted/rendered correctly in the chat UI
+
+==================================================
+THIS MEANS
+==================================================
+
+The system currently handles:
+- incoming messages correctly
+
+BUT likely FAILS for:
+- outgoing/self-authored messages
+- self-sent events
+- sender direction normalization
+- own-account message reconciliation
+
+==================================================
+YOU MUST INVESTIGATE ALL OF THESE
+==================================================
+
+1. Are outgoing messages filtered accidentally?
+2. Are self-authored messages ignored?
+3. Is sender direction logic broken?
+4. Is message ownership detection incorrect?
+5. Is the app only rendering inbound messages?
+6. Is the DB storing outgoing messages correctly?
+7. Is frontend filtering:
+   isIncoming === true ?
+8. Is webhook normalization dropping self messages?
+9. Is provider sender_id matching incorrectly?
+10. Are outgoing events treated as delivery receipts only?
+
+==================================================
+MOST LIKELY ROOT CAUSE
+==================================================
+
+Very likely one of these:
+
+A)
+Outgoing/self-authored messages are being ignored during normalization.
+
+OR
+
+B)
+Message direction logic is broken:
+- inbound works
+- outbound ignored
+
+OR
+
+C)
+Webhook events for self messages use different schema fields and are not mapped correctly.
+
+OR
+
+D)
+Frontend only renders messages from:
+other_user_id
+instead of ALL conversation messages.
+
+==================================================
+REQUIRED FIX
+==================================================
+
+Implement FULL bidirectional conversation syncing.
+
+The conversation UI MUST display:
+- incoming messages
+- outgoing messages
+- self-authored messages
+- mobile-originated messages
+- web-originated messages
+- app-originated messages
+
+ALL together in ONE consistent timeline.
+
+Exactly like WhatsApp Web.
+
+==================================================
+PHASE 1 — MESSAGE DIRECTION NORMALIZATION
+==================================================
+
+Normalize every message into:
+
+{
+  id,
+  conversationId,
+  senderId,
+  direction,
+  content,
+  timestamp
+}
+
+Where:
+direction:
+- inbound
+- outbound
+
+Determine correctly using:
+- account owner identity
+- provider account ID
+- attendee identity
+- Unipile metadata
+
+==================================================
+PHASE 2 — HANDLE SELF-SENT EVENTS
+==================================================
+
+Investigate how Unipile represents:
+- messages sent from own device
+- WhatsApp Web messages
+- mobile messages
+
+Map them correctly.
+
+DO NOT ignore them.
+
+==================================================
+PHASE 3 — DATABASE VALIDATION
+==================================================
+
+Verify:
+- outbound messages are inserted
+- not overwritten
+- not filtered
+- not deduplicated incorrectly
+
+Inspect:
+- provider message IDs
+- sender IDs
+- account IDs
+- conversation IDs
+
+==================================================
+PHASE 4 — FRONTEND MESSAGE RENDERING
+==================================================
+
+Ensure chat UI renders:
+- inbound messages on left
+- outbound messages on right
+
+regardless of source:
+- mobile
+- web
+- app
+- webhook
+
+==================================================
+PHASE 5 — REALTIME PIPELINE
+==================================================
+
+When I send from WhatsApp mobile/web:
+↓
+Webhook arrives
+↓
+Message normalized correctly
+↓
+Direction marked outbound
+↓
+DB inserted
+↓
+Realtime event broadcast
+↓
+Frontend cache updates
+↓
+Message appears instantly in UI
+
+WITHOUT refresh.
+
+==================================================
+PHASE 6 — VERIFY USING REAL DEVICES
+==================================================
+
+Test ALL cases:
+
+1. Send from mobile WhatsApp
+2. Send from WhatsApp Web
+3. Send from app UI
+4. Receive from another user
+
+Verify:
+- all appear in same timeline
+- no missing messages
+- no duplicates
+- correct alignment
+- correct realtime updates
+
+==================================================
+EXPECTED FINAL RESULT
+==================================================
+
+The Unified Inbox should behave EXACTLY like WhatsApp Web:
+
+- every sent message visible
+- every received message visible
+- single consistent timeline
+- realtime updates
+- no gaps
+- no missing outbound messages
+
+==================================================
+IMPORTANT
+==================================================
+
+Do NOT patch this superficially.
+
+This is a core conversation synchronization + message direction architecture issue.
+
+Implement proper bidirectional message reconciliation using Unipile event metadata correctly.

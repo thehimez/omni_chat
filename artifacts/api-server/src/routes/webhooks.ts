@@ -186,12 +186,6 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
       event === "message_received";
 
     if (isNewMessage) {
-      // Skip messages WE sent — is_sender=true means outbound
-      if (payload.is_sender === true) {
-        res.json(UnipileWebhookResponse.parse({ status: "ok" }));
-        return;
-      }
-
       // ── Guard: only process webhooks from accounts we know about ──────────
       // Unipile sends every webhook TWICE — once per internal account ID.
       // One is the real account (in our connectedAccounts table), the other
@@ -237,13 +231,20 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
         payload.data?.timestamp ??
         null;
 
-      const senderName: string =
-        payload.sender?.attendee_name ??
-        payload.sender?.attendee_public_identifier ??
-        payload.data?.sender?.name ??
-        payload.data?.sender?.display_name ??
-        payload.data?.from?.name ??
-        "Unknown";
+      // is_sender=true means WE sent this message (from phone, WhatsApp Web,
+      // or the app itself). Use it to set direction — don't skip these.
+      // App-sent messages are deduplicated via the deterministic message ID.
+      const isSender: boolean = payload.is_sender === true;
+      const direction: "inbound" | "outbound" = isSender ? "outbound" : "inbound";
+
+      const senderName: string = isSender
+        ? "Me"
+        : (payload.sender?.attendee_name ??
+           payload.sender?.attendee_public_identifier ??
+           payload.data?.sender?.name ??
+           payload.data?.sender?.display_name ??
+           payload.data?.from?.name ??
+           "Unknown");
 
       // Derive platform: sender specifics > top-level provider > account lookup
       const rawProvider: string | null =
@@ -301,16 +302,15 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
           userId: existing[0].userId,
           platform: platform ?? existing[0].platform,
           externalId: externalMsgId,
-          direction: "inbound",
+          direction,                        // "inbound" or "outbound" from is_sender
           bodyText: bodyText || "(Media)",
           senderName,
-          isRead: false,
+          isRead: isSender ? true : false,  // own sent messages are already "read"
           sentAt,
         }).onConflictDoNothing().returning({ id: messagesTable.id });
 
         if (inserted.length === 0) {
-          // Duplicate — already processed this message (mirror account webhook
-          // or Unipile retry). Skip the conversation update and SSE broadcast.
+          // Duplicate — already processed (mirror account webhook or retry). Skip.
           logger.debug({ msgId, externalMsgId, chatId }, "Duplicate message webhook ignored");
         } else {
           await db
@@ -318,8 +318,11 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
             .set({
               ...(headline ? { headline } : {}),
               lastMessageAt: sentAt,
-              unreadCount: existing[0].unreadCount + 1,
-              isRead: false,
+              // Only bump unread count for incoming messages, not our own sends
+              ...(isSender ? {} : {
+                unreadCount: existing[0].unreadCount + 1,
+                isRead: false,
+              }),
             })
             .where(eq(conversationsTable.id, existing[0].id));
 
@@ -328,10 +331,11 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
             senderName,
             preview: bodyText.slice(0, 80) || "(Media)",
             platform: platform ?? existing[0].platform,
+            direction,
           });
 
           logger.info(
-            { conversationId: existing[0].id, userId: existing[0].userId, chatId, msgId },
+            { conversationId: existing[0].id, userId: existing[0].userId, chatId, msgId, direction },
             "new_message: saved & broadcast to SSE",
           );
         }
