@@ -1,0 +1,236 @@
+```txt id="gdfw6n"
+There is still a MAJOR realtime synchronization architecture failure in the Unified Inbox.
+
+CURRENT CRITICAL ISSUE
+==================================================
+
+To see ANY new received message, I currently must:
+
+1. Click "Sync All"
+2. THEN manually reload/refresh the website
+
+ONLY AFTER BOTH:
+- sync all
+- browser refresh
+
+the new messages finally appear.
+
+This is completely wrong behavior for a modern messaging product.
+
+The app should behave like:
+- WhatsApp Web
+- Gmail
+- Slack
+- Discord
+- Messenger
+
+Meaning:
+- new messages appear automatically
+- inbox updates instantly
+- active chat updates live
+- no manual sync
+- no page refresh
+
+==================================================
+CURRENT BROKEN FLOW
+==================================================
+
+RIGHT NOW:
+New WhatsApp message arrives
+↓
+Inbox does NOT update
+↓
+I click "Sync All"
+↓
+Still no UI update
+↓
+I manually refresh browser
+↓
+ONLY THEN new messages appear
+
+This proves:
+- frontend state is stale
+- realtime propagation is broken
+- cache invalidation missing
+- React Query/SWR cache not mutating
+- websocket/SSE architecture incomplete
+- sync endpoint not triggering UI updates
+- or DB writes are disconnected from frontend subscriptions
+
+==================================================
+YOU MUST INVESTIGATE THE FULL PIPELINE
+==================================================
+
+Check ALL of these deeply:
+
+1. Does Sync All actually update DB?
+2. Does frontend refetch after sync?
+3. Does realtime layer broadcast updates?
+4. Does inbox query invalidate?
+5. Does conversation list rerender?
+6. Does selected conversation rerender?
+7. Are websocket/SSE subscriptions working?
+8. Are React Query caches stale forever?
+9. Is optimistic state missing?
+10. Is the app relying on page hydration instead of reactive updates?
+
+==================================================
+THIS IS THE EXPECTED BEHAVIOR
+==================================================
+
+NEW MESSAGE ARRIVES
+↓
+Webhook received instantly
+↓
+Message saved to DB
+↓
+Conversation updated
+↓
+updatedAt changes
+↓
+Realtime event broadcast
+↓
+Frontend cache updates
+↓
+Inbox rerenders instantly
+↓
+Conversation moves to top
+↓
+Unread badge appears
+↓
+Open chat updates live
+
+ALL WITHOUT:
+- Sync All
+- browser refresh
+- manual reload
+
+==================================================
+REQUIRED IMPLEMENTATION
+==================================================
+
+PHASE 1 — REMOVE DEPENDENCY ON MANUAL REFRESH
+--------------------------------------------------
+
+The UI MUST become reactive.
+
+NO page refresh should EVER be required.
+
+Fix:
+- stale state
+- stale route hydration
+- stale caches
+- missing invalidation
+- missing subscriptions
+- missing rerenders
+
+==================================================
+
+PHASE 2 — REMOVE DEPENDENCY ON "SYNC ALL"
+--------------------------------------------------
+
+"Sync All" should become:
+- optional fallback only
+- not required for normal operation
+
+Realtime sync should happen automatically through:
+- webhooks
+- incremental sync
+- event-driven updates
+
+==================================================
+
+PHASE 3 — IMPLEMENT PROPER REALTIME ARCHITECTURE
+--------------------------------------------------
+
+Implement:
+
+1. Webhook ingestion
+2. Incremental sync
+3. DB updates
+4. WebSocket/SSE broadcasting
+5. React Query invalidation
+6. Optimistic UI updates
+7. Live inbox rerendering
+
+==================================================
+
+PHASE 4 — FRONTEND REALTIME CACHE SYSTEM
+--------------------------------------------------
+
+When new message arrives:
+- mutate cache instantly
+- reorder inbox instantly
+- update previews instantly
+- update unread counts instantly
+- update open conversation instantly
+
+NO FULL REFRESHES.
+
+==================================================
+
+PHASE 5 — INVESTIGATE WHY REFRESH FIXES IT
+--------------------------------------------------
+
+This is VERY important.
+
+If browser refresh fixes everything,
+then:
+- the backend data likely EXISTS already
+- BUT frontend state is stale
+
+Find the EXACT reason:
+- hydration mismatch?
+- useEffect missing dependency?
+- route state not reactive?
+- stale query key?
+- websocket disconnected?
+- provider not mounted globally?
+
+==================================================
+
+PHASE 6 — REALTIME ACTIVE CHAT
+--------------------------------------------------
+
+If user is currently inside a conversation:
+- new incoming messages should appear instantly
+- without leaving the chat
+- without reload
+- without Sync All
+
+Exactly like WhatsApp Web.
+
+==================================================
+
+PHASE 7 — VERIFY USING REAL MESSAGES
+--------------------------------------------------
+
+Test with REAL:
+- WhatsApp messages
+- Gmail emails
+- LinkedIn messages
+
+Verify:
+- automatic arrival
+- inbox reordering
+- unread updates
+- live chat updates
+- zero refreshes
+- zero manual sync
+
+==================================================
+IMPORTANT
+==================================================
+
+Do NOT add temporary patches.
+
+Do NOT use polling hacks every few seconds.
+
+Implement proper event-driven realtime architecture using:
+- official Unipile webhook system
+- incremental sync
+- websocket/SSE broadcasting
+- reactive frontend cache updates
+
+This app must feel like a REAL modern communication platform.
+```
