@@ -291,6 +291,11 @@ interface UnipileChat {
   last_message_date?: string | null;
   unread_count?: number;
   attendee_public_identifier?: string | null;
+  // Additional fields Unipile may include (vary by version/provider)
+  identifier?: string | null;
+  jid?: string | null;
+  provider_id?: string | null;
+  chat_id?: string | null;
 }
 
 interface UnipileChatMessage {
@@ -374,11 +379,11 @@ async function syncChats(
     const convId = `conv_${accountId}_${chat.id.slice(-16)}`;
     const lastAt = chat.last_message_date ?? chat.timestamp ?? new Date().toISOString();
 
-    // attendee_public_identifier is the native platform chat ID
-    // (e.g. "919019410659@s.whatsapp.net" for WhatsApp) which Unipile
-    // sends as provider_chat_id in webhooks. Store it so webhooks can
-    // look up conversations by either ID.
-    const providerChatId = chat.attendee_public_identifier ?? null;
+    // Resolve the native platform chat ID (e.g. "919019410659@s.whatsapp.net"
+    // for personal WhatsApp, "120363...@g.us" for groups). Unipile stores this
+    // in attendee_public_identifier for DMs; for groups it may be in other fields.
+    // We check all known field names so webhook lookups can match by provider JID.
+    const providerChatId = chatProviderJid(chat);
 
     await db
       .insert(conversationsTable)
@@ -459,6 +464,18 @@ async function syncChats(
  * This helper searches the account's chat list for a matching attendee_public_identifier
  * and returns the Unipile-internal chat ID.
  */
+/** Resolve any possible native provider JID field from a chat object */
+function chatProviderJid(chat: UnipileChat): string | null {
+  return (
+    chat.attendee_public_identifier ||
+    chat.identifier ||
+    chat.jid ||
+    chat.provider_id ||
+    chat.chat_id ||
+    null
+  );
+}
+
 async function resolveInternalChatId(
   providerChatId: string,
   unipileAccountId: string,
@@ -466,6 +483,18 @@ async function resolveInternalChatId(
   apiKey: string,
 ): Promise<string | null> {
   try {
+    // Strategy 1: Unipile identifier query param (fastest, O(1) if supported)
+    // Unipile may support filtering chats by native provider JID directly.
+    const identifierUrl = `https://${host}/api/v1/chats?account_id=${unipileAccountId}&identifier=${encodeURIComponent(providerChatId)}&limit=1`;
+    const identifierResp = await fetch(identifierUrl, { headers: unipileHeaders(apiKey) });
+    if (identifierResp.ok) {
+      const identifierData = await identifierResp.json() as { items?: UnipileChat[] };
+      const found = identifierData.items?.[0];
+      if (found?.id) return found.id;
+    }
+
+    // Strategy 2: Page through the chats list and match on any native JID field
+    // Covers: attendee_public_identifier (personal chats), identifier/jid/etc (groups)
     let cursor: string | undefined;
     for (let page = 0; page < 5; page++) {
       const url = `https://${host}/api/v1/chats?account_id=${unipileAccountId}&limit=100${cursor ? `&cursor=${cursor}` : ""}`;
@@ -473,7 +502,7 @@ async function resolveInternalChatId(
       if (!resp.ok) break;
       const data = await resp.json() as { items?: UnipileChat[]; cursor?: string };
       const items = data.items ?? [];
-      const match = items.find((c) => c.attendee_public_identifier === providerChatId);
+      const match = items.find((c) => chatProviderJid(c) === providerChatId);
       if (match) return match.id;
       if (!data.cursor || items.length === 0) break;
       cursor = data.cursor;
@@ -544,7 +573,9 @@ export async function syncChatById(
     // bad ID like "918837424644@s.whatsapp.net" from becoming the convId suffix.
     const convId = `conv_${accountDbId}_${resolvedChatId.slice(-16)}`;
     const lastAt = chat.last_message_date ?? chat.timestamp ?? new Date().toISOString();
-    const providerChatId = chat.attendee_public_identifier ?? externalChatId;
+    // Use any available native JID field, fall back to the externalChatId that
+    // was passed to us (which might already be the native JID from the webhook)
+    const providerChatId = chatProviderJid(chat) ?? externalChatId;
 
     await db
       .insert(conversationsTable)

@@ -303,6 +303,19 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
         .limit(1);
 
       if (existing[0]) {
+        // ── Backfill providerChatId if missing ────────────────────────────
+        // Groups are stored during sync with providerChatId=null because
+        // Unipile's chat list doesn't expose the native group JID directly.
+        // When the first webhook arrives, we learn the native JID (chatId)
+        // and store it so that all subsequent webhook lookups use direct match.
+        if (!existing[0].providerChatId && chatId) {
+          await db
+            .update(conversationsTable)
+            .set({ providerChatId: chatId })
+            .where(eq(conversationsTable.id, existing[0].id));
+          logger.info({ convId: existing[0].id, chatId }, "Backfilled providerChatId for group/conversation");
+        }
+
         // ── Deterministic message ID ───────────────────────────────────────
         // Derive the ID from the provider's message_id so that if the same
         // webhook arrives a second time (retry, mirror account, etc.) the
