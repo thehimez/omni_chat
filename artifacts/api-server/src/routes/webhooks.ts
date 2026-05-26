@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { db, usersTable, connectedAccountsTable, conversationsTable, messagesTable } from "@workspace/db";
 import { StripeWebhookResponse, UnipileWebhookResponse } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
@@ -247,10 +247,21 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
       const sentAt = sentAtRaw ? new Date(sentAtRaw) : new Date();
 
       // ── Look up existing conversation ─────────────────────────────────────
+      // Match by Unipile internal ID (externalId) OR by native platform ID
+      // (providerChatId, e.g. "919019410659@s.whatsapp.net" for WhatsApp).
+      // Unipile webhooks send the native platform ID in provider_chat_id,
+      // while our initial sync stores the Unipile internal ID as externalId.
+      // We now store both — this OR covers legacy rows where providerChatId
+      // wasn't populated yet (until the next Sync All fills them in).
       const existing = await db
         .select()
         .from(conversationsTable)
-        .where(eq(conversationsTable.externalId, chatId))
+        .where(
+          or(
+            eq(conversationsTable.externalId, chatId),
+            eq(conversationsTable.providerChatId, chatId),
+          ),
+        )
         .limit(1);
 
       if (existing[0]) {

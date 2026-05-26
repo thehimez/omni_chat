@@ -7,6 +7,7 @@ export const conversationsTable = pgTable("conversations", {
   userId: text("user_id").notNull(),
   platform: text("platform").notNull(),
   externalId: text("external_id"),
+  providerChatId: text("provider_chat_id"),
   contactName: text("contact_name").notNull(),
   contactAvatarUrl: text("contact_avatar_url"),
   contactId: text("contact_id"),

@@ -340,6 +340,12 @@ async function syncChats(
     const convId = `conv_${accountId}_${chat.id.slice(-16)}`;
     const lastAt = chat.last_message_date ?? chat.timestamp ?? new Date().toISOString();
 
+    // attendee_public_identifier is the native platform chat ID
+    // (e.g. "919019410659@s.whatsapp.net" for WhatsApp) which Unipile
+    // sends as provider_chat_id in webhooks. Store it so webhooks can
+    // look up conversations by either ID.
+    const providerChatId = chat.attendee_public_identifier ?? null;
+
     await db
       .insert(conversationsTable)
       .values({
@@ -347,6 +353,7 @@ async function syncChats(
         userId,
         platform,
         externalId: chat.id,
+        providerChatId,
         contactName,
         headline,
         contactAvatarUrl: avatarUrl,
@@ -358,6 +365,7 @@ async function syncChats(
       .onConflictDoUpdate({
         target: conversationsTable.id,
         set: {
+          providerChatId,
           contactName,
           headline,
           contactAvatarUrl: avatarUrl,
@@ -451,6 +459,8 @@ export async function syncChatById(
     const convId = `conv_${accountDbId}_${externalChatId.slice(-16)}`;
     const lastAt = chat.last_message_date ?? chat.timestamp ?? new Date().toISOString();
 
+    const providerChatId = chat.attendee_public_identifier ?? null;
+
     await db
       .insert(conversationsTable)
       .values({
@@ -458,6 +468,7 @@ export async function syncChatById(
         userId,
         platform,
         externalId: externalChatId,
+        providerChatId,
         contactName,
         headline,
         contactAvatarUrl: avatarUrl,
@@ -469,6 +480,7 @@ export async function syncChatById(
       .onConflictDoUpdate({
         target: conversationsTable.id,
         set: {
+          providerChatId,
           contactName,
           headline,
           contactAvatarUrl: avatarUrl,
