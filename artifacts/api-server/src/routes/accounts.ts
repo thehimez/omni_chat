@@ -14,6 +14,7 @@ import {
 import { requireAuth } from "../middleware/auth";
 import { logger } from "../lib/logger";
 import { syncAccount } from "../lib/unipile-sync";
+import { broadcastToUser } from "../lib/sse-broadcaster";
 
 const router: IRouter = Router();
 
@@ -220,6 +221,8 @@ router.post("/accounts/:id/sync", requireAuth, async (req: Request, res: Respons
   syncAccount(rawId, user.id)
     .then(({ synced, platform }) => {
       logger.info({ jobId, synced, platform }, "Sync job completed");
+      // Notify all connected SSE clients for this user so the inbox refetches
+      broadcastToUser(user.id, "sync_complete", { platform, synced });
     })
     .catch((err) => {
       logger.error({ err, jobId }, "Sync job failed");

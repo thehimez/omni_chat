@@ -64,18 +64,21 @@ router.get("/events", async (req: Request, res: Response): Promise<void> => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.flushHeaders();
 
+  // Tell the browser to reconnect in 3s if the connection drops
+  res.write(`retry: 3000\n`);
   res.write(`event: connected\ndata: {"status":"connected","userId":"${user.id}"}\n\n`);
 
   const clientId = addSseClient(user.id, res);
   logger.info({ userId: user.id, clientId }, "SSE client connected");
 
+  // Ping every 10s — Replit's proxy kills idle connections at ~15s
   const ping = setInterval(() => {
     try {
       res.write(":ping\n\n");
     } catch {
       clearInterval(ping);
     }
-  }, 25000);
+  }, 10000);
 
   req.on("close", () => {
     clearInterval(ping);

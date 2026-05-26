@@ -30,7 +30,10 @@ export default function Inbox() {
   const [, navigate] = useLocation();
   const selectedId = new URLSearchParams(search).get("id");
 
-  const { data: conversationsData, isLoading: isLoadingList, refetch } = useGetConversations();
+  const { data: conversationsData, isLoading: isLoadingList, refetch } = useGetConversations(
+    undefined,
+    { query: { refetchInterval: 15000, staleTime: 0 } },
+  );
   const { data: accountsData } = useGetConnectedAccounts();
   const syncMutation = useTriggerSync();
   const queryClient = useQueryClient();

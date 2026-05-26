@@ -16,7 +16,15 @@ import Billing from "@/pages/Billing";
 import Admin from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+      retry: 1,
+    },
+  },
+});
 
 function AppRoutes() {
   return (

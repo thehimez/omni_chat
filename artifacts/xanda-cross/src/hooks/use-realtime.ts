@@ -50,7 +50,7 @@ export function useRealtime() {
       esRef.current = es;
 
       es.addEventListener("connected", () => {
-        delayRef.current = 2000;
+        delayRef.current = 1000; // reset to fast reconnect after a successful connect
       });
 
       es.addEventListener("new_message", (e: MessageEvent) => {
@@ -73,6 +73,12 @@ export function useRealtime() {
         } catch {}
       });
 
+      es.addEventListener("sync_complete", () => {
+        // Background sync finished — refresh the full inbox
+        invalidateConversations();
+        queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
+      });
+
       es.addEventListener("account_updated", () => {
         queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
       });
@@ -81,8 +87,9 @@ export function useRealtime() {
         es.close();
         esRef.current = null;
         if (!mountedRef.current) return;
-        const delay = Math.min(delayRef.current, 30000);
-        delayRef.current = delay * 1.5;
+        // Linear backoff capped at 10s (not exponential) so we reconnect quickly
+        const delay = Math.min(delayRef.current, 10000);
+        delayRef.current = delay + 1000;
         reconnectRef.current = setTimeout(connect, delay);
       };
     }
