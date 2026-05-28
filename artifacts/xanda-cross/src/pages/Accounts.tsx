@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { 
-  useGetConnectedAccounts, 
-  useConnectAccount, 
-  useDisconnectAccount, 
+import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  useGetConnectedAccounts,
+  useConnectAccount,
+  useDisconnectAccount,
   useTriggerSync,
   getGetConnectedAccountsQueryKey
 } from "@workspace/api-client-react";
@@ -11,13 +11,28 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlatformIcon } from "@/components/platform-icon";
-import { RefreshCw, Unlink, Link2, Plus, CheckCircle, AlertCircle } from "lucide-react";
+import { RefreshCw, Unlink, Link2, Plus, CheckCircle, AlertCircle, Play, Pause, Radio } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { useAppAuth } from "@/lib/auth";
 
 const PLATFORMS = ['gmail', 'outlook', 'whatsapp', 'linkedin', 'slack', 'telegram', 'instagram'];
+const LIVE_SYNC_INTERVAL_MS = 30_000; // 30 seconds
+const STORAGE_KEY = "xanda_live_sync_paused"; // set of account IDs that are paused
+
+function getPausedSet(): Set<string> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function savePausedSet(s: Set<string>) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...s]));
+}
 
 export default function Accounts() {
   const { data, isLoading, refetch } = useGetConnectedAccounts();
@@ -28,7 +43,92 @@ export default function Accounts() {
   const { toast } = useToast();
   const { token } = useAppAuth();
 
-  // ── Handle redirect-back from Unipile with ?connected=X&account_id=Y ──────
+  // Per-account live sync: paused set persisted in localStorage (default = live for all)
+  const [pausedIds, setPausedIds] = useState<Set<string>>(getPausedSet);
+  // Track which accounts are mid-sync cycle right now (for spinner)
+  const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
+  // Tick counter to show "last synced X ago" updating each second
+  const [, setTick] = useState(0);
+  const intervalsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+
+  // Update "X ago" display every 10 seconds
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 10_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const triggerSync = useCallback(
+    async (accountId: string) => {
+      setSyncingIds((prev) => new Set(prev).add(accountId));
+      try {
+        await fetch(`/api/accounts/${accountId}/sync`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ depth: "incremental" }),
+        });
+        queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
+      } catch {
+        // silent — background sync, don't toast
+      } finally {
+        setSyncingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(accountId);
+          return next;
+        });
+      }
+    },
+    [token, queryClient],
+  );
+
+  // Manage per-account intervals whenever accounts list or pausedIds changes
+  useEffect(() => {
+    const accounts = data?.accounts ?? [];
+    const currentIntervalIds = new Set(intervalsRef.current.keys());
+
+    // Remove intervals for accounts that no longer exist or are now paused
+    for (const id of currentIntervalIds) {
+      if (!accounts.find((a) => a.id === id) || pausedIds.has(id)) {
+        clearInterval(intervalsRef.current.get(id));
+        intervalsRef.current.delete(id);
+      }
+    }
+
+    // Add intervals for live accounts that don't have one yet
+    for (const acc of accounts) {
+      if (!pausedIds.has(acc.id) && !intervalsRef.current.has(acc.id)) {
+        // Fire immediately on start, then every 30s
+        triggerSync(acc.id);
+        const interval = setInterval(() => triggerSync(acc.id), LIVE_SYNC_INTERVAL_MS);
+        intervalsRef.current.set(acc.id, interval);
+      }
+    }
+
+    return () => {
+      // Cleanup on unmount
+      for (const interval of intervalsRef.current.values()) clearInterval(interval);
+      intervalsRef.current.clear();
+    };
+  }, [data?.accounts, pausedIds, triggerSync]);
+
+  const toggleLiveSync = (accountId: string) => {
+    setPausedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(accountId)) {
+        next.delete(accountId); // resume → will trigger effect to create interval
+      } else {
+        next.add(accountId); // pause → effect will clear interval
+      }
+      savePausedSet(next);
+      return next;
+    });
+  };
+
+  const handleManualSync = (id: string) => {
+    triggerSync(id);
+    toast({ title: "Syncing now…", description: "Fetching latest messages." });
+  };
+
+  // ── Handle redirect-back from Unipile/Slack with ?connected=X&account_id=Y ──
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const connectedPlatform = params.get("connected");
@@ -42,31 +142,18 @@ export default function Accounts() {
     }
 
     if (connectedPlatform && accountId) {
-      // Confirm the account in our DB immediately (webhook may lag a few seconds)
       fetch("/api/accounts/confirm", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ platform: connectedPlatform, unipileAccountId: accountId }),
       })
         .then(() => {
           queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
-          toast({
-            title: `${connectedPlatform.charAt(0).toUpperCase() + connectedPlatform.slice(1)} connected!`,
-            description: "Your account is now connected and syncing.",
-          });
+          toast({ title: `${connectedPlatform.charAt(0).toUpperCase() + connectedPlatform.slice(1)} connected!`, description: "Your account is now live and syncing." });
         })
-        .catch(() => {
-          // Refetch anyway — webhook might have already saved it
-          queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
-        });
-
-      // Clean up URL so a refresh doesn't re-run this
+        .catch(() => queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() }));
       window.history.replaceState({}, "", window.location.pathname);
     } else if (connectedPlatform) {
-      // Redirect back without account_id — just refresh the list
       queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
       toast({ title: "Account connected!", description: "Your account is now syncing." });
       window.history.replaceState({}, "", window.location.pathname);
@@ -74,7 +161,6 @@ export default function Accounts() {
   }, []);
 
   const handleConnect = (platform: string) => {
-    // Open popup synchronously (must be inside the click handler — async callbacks get blocked)
     const popup = window.open("", "_blank", "width=620,height=800,scrollbars=yes,resizable=yes");
     if (popup) {
       popup.document.write(
@@ -114,21 +200,22 @@ export default function Accounts() {
     });
   };
 
-  const handleSync = (id: string) => {
-    syncMutation.mutate({ id, data: { depth: "full" } }, {
-      onSuccess: () => {
-        toast({ title: "Sync triggered", description: "Syncing in the background." });
-        queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
-      },
-    });
-  };
-
+  const liveCount = (data?.accounts ?? []).filter((a) => !pausedIds.has(a.id)).length;
   const connectedPlatformSet = new Set(data?.accounts?.map((a) => a.platform) ?? []);
 
   return (
     <div className="h-full flex flex-col bg-background">
-      <header className="h-14 border-b flex items-center px-6 shrink-0 bg-card">
+      <header className="h-14 border-b flex items-center px-6 shrink-0 bg-card justify-between">
         <h1 className="font-semibold">Connected Accounts</h1>
+        {liveCount > 0 && (
+          <div className="flex items-center gap-2 text-xs text-emerald-400">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            {liveCount} account{liveCount > 1 ? "s" : ""} syncing live · every 30s
+          </div>
+        )}
       </header>
 
       <div className="flex-1 overflow-y-auto p-6">
@@ -143,56 +230,112 @@ export default function Accounts() {
               </div>
             ) : data?.accounts && data.accounts.length > 0 ? (
               <div className="grid gap-4">
-                {data.accounts.map((acc) => (
-                  <Card key={acc.id} className="overflow-hidden">
-                    <div className={`h-1 w-full ${acc.status === "syncing" ? "bg-primary animate-pulse" : acc.status === "error" ? "bg-destructive" : "bg-primary/20"}`} />
-                    <CardContent className="p-5 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-lg bg-accent flex items-center justify-center shrink-0">
-                          <PlatformIcon platform={acc.platform} className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">{acc.displayName}</h3>
-                            <Badge
-                              variant={acc.status === "error" ? "destructive" : "secondary"}
-                              className={`text-[10px] capitalize ${acc.status === "connected" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : ""}`}
-                            >
-                              {acc.status === "connected" && <CheckCircle className="w-2.5 h-2.5 mr-1" />}
-                              {acc.status === "error" && <AlertCircle className="w-2.5 h-2.5 mr-1" />}
-                              {acc.status}
-                            </Badge>
+                {data.accounts.map((acc) => {
+                  const isLive = !pausedIds.has(acc.id);
+                  const isSyncing = syncingIds.has(acc.id) || acc.status === "syncing";
+
+                  return (
+                    <Card key={acc.id} className="overflow-hidden">
+                      {/* Top progress bar */}
+                      <div className={`h-0.5 w-full transition-colors ${
+                        isSyncing
+                          ? "bg-primary animate-pulse"
+                          : isLive
+                          ? "bg-emerald-500/40"
+                          : acc.status === "error"
+                          ? "bg-destructive"
+                          : "bg-primary/10"
+                      }`} />
+
+                      <CardContent className="p-5 flex items-center justify-between gap-4">
+                        {/* Left: icon + info */}
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="w-12 h-12 rounded-lg bg-accent flex items-center justify-center shrink-0">
+                            <PlatformIcon platform={acc.platform} className="w-6 h-6" />
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {acc.lastSyncAt
-                              ? `Last synced: ${format(new Date(acc.lastSyncAt), "MMM d, h:mm a")}`
-                              : "Never synced"}
-                          </p>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold">{acc.displayName}</h3>
+                              {/* Live / Paused badge */}
+                              {isLive ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                  <span className="relative flex h-1.5 w-1.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                                  </span>
+                                  Live
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                                  <Pause className="w-2 h-2" />
+                                  Paused
+                                </span>
+                              )}
+                              {/* Error badge */}
+                              {acc.status === "error" && (
+                                <Badge variant="destructive" className="text-[10px]">
+                                  <AlertCircle className="w-2.5 h-2.5 mr-1" />
+                                  Error
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {isSyncing
+                                ? "Syncing…"
+                                : acc.lastSyncAt
+                                ? `Last synced ${formatDistanceToNow(new Date(acc.lastSyncAt), { addSuffix: true })}`
+                                : "Never synced"}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSync(acc.id)}
-                          disabled={syncMutation.isPending || acc.status === "syncing"}
-                        >
-                          <RefreshCw className={`w-4 h-4 mr-2 ${acc.status === "syncing" ? "animate-spin" : ""}`} />
-                          Sync
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => handleDisconnect(acc.id)}
-                          disabled={disconnectMutation.isPending}
-                        >
-                          <Unlink className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+
+                        {/* Right: controls */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* Play/Pause toggle */}
+                          <Button
+                            variant={isLive ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => toggleLiveSync(acc.id)}
+                            className={isLive
+                              ? "bg-emerald-600 hover:bg-emerald-700 text-white border-0 gap-1.5"
+                              : "gap-1.5"
+                            }
+                            title={isLive ? "Pause live sync" : "Resume live sync"}
+                          >
+                            {isLive
+                              ? <><Pause className="w-3.5 h-3.5" /> Pause</>
+                              : <><Play className="w-3.5 h-3.5" /> Resume</>
+                            }
+                          </Button>
+
+                          {/* Manual sync */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleManualSync(acc.id)}
+                            disabled={isSyncing}
+                            title="Sync now"
+                            className="h-8 w-8"
+                          >
+                            <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
+                          </Button>
+
+                          {/* Disconnect */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
+                            onClick={() => handleDisconnect(acc.id)}
+                            disabled={disconnectMutation.isPending}
+                            title="Disconnect"
+                          >
+                            <Unlink className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             ) : (
               <Card className="border-dashed bg-accent/30">
