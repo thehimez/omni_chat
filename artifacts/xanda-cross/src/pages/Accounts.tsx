@@ -4,7 +4,6 @@ import {
   useConnectAccount,
   useDisconnectAccount,
   getGetConnectedAccountsQueryKey,
-  getAuthToken,
 } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,16 +14,13 @@ import { RefreshCw, Unlink, Link2, Plus, AlertCircle, Play, Pause } from "lucide
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
-import { useAppAuth } from "@/lib/auth";
 
-const PLATFORMS = ["gmail", "outlook", "whatsapp", "linkedin", "slack", "telegram", "instagram"];
+const PLATFORMS = ["gmail", "outlook", "whatsapp", "linkedin", "telegram", "instagram"];
 const LIVE_SYNC_INTERVAL_MS = 30_000;
 const ACCOUNTS_REFRESH_MS = 60_000;
 const STORAGE_KEY = "xanda_live_sync_paused_v3";
 
 // ── Module-level live state ───────────────────────────────────────────────────
-// Avoids useRef so HMR can't corrupt values across hot reloads.
-// Updated synchronously on every render so the interval closure always reads fresh data.
 const _live = {
   accounts: [] as Array<{ id: string; platform: string }>,
   paused: new Set<string>(),
@@ -43,15 +39,14 @@ function savePaused(s: Set<string>) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify([...s]));
 }
 
+// Cookie-based auth: browser includes Clerk session cookie automatically.
+// No Authorization header needed.
 async function doSync(accountId: string): Promise<void> {
   try {
-    const token = await getAuthToken();
     await fetch(`/api/accounts/${accountId}/sync`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ depth: "incremental" }),
     });
   } catch {
@@ -65,23 +60,20 @@ export default function Accounts() {
   const disconnectMutation = useDisconnectAccount();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { signOut } = useAppAuth();
 
   const [pausedIds, setPausedIds] = useState<Set<string>>(getPaused);
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set<string>());
   const [, setTick] = useState(0);
 
-  // Keep module-level live state in sync on every render (no useRef needed)
   _live.accounts = (data?.accounts ?? []) as Array<{ id: string; platform: string }>;
   _live.paused = pausedIds;
   _live.syncingIds = syncingIds;
 
-  // ── Single stable interval — created once on mount, never recreated ──────────
   useEffect(() => {
     const triggerAll = () => {
       for (const acc of _live.accounts) {
         if (_live.paused.has(acc.id)) continue;
-        if (_live.syncingIds.has(acc.id)) continue; // already in flight
+        if (_live.syncingIds.has(acc.id)) continue;
         setSyncingIds((prev) => new Set(prev).add(acc.id));
         doSync(acc.id).finally(() => {
           setSyncingIds((prev) => {
@@ -93,14 +85,9 @@ export default function Accounts() {
       }
     };
 
-    // First fire after 1.5s so accounts data can load
     const boot = setTimeout(triggerAll, 1500);
     const syncTimer = setInterval(triggerAll, LIVE_SYNC_INTERVAL_MS);
-
-    // Slow refresh: just re-fetches account list to update "last synced X ago"
     const refreshTimer = setInterval(() => refetch(), ACCOUNTS_REFRESH_MS);
-
-    // Tick for time-ago display
     const tickTimer = setInterval(() => setTick((n) => n + 1), 15_000);
 
     return () => {
@@ -110,14 +97,13 @@ export default function Accounts() {
       clearInterval(tickTimer);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally empty — reads live state via _live object
+  }, []);
 
   const toggleLive = (id: string) => {
     setPausedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
-        // Immediate sync on resume
         setSyncingIds((s) => new Set(s).add(id));
         doSync(id).finally(() =>
           setSyncingIds((s) => { const n = new Set(s); n.delete(id); return n; })
@@ -139,7 +125,6 @@ export default function Accounts() {
       );
   };
 
-  // ── Handle OAuth redirect-back ───────────────────────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const platform = params.get("connected");
@@ -151,12 +136,12 @@ export default function Accounts() {
       return;
     }
     if (platform && accountId) {
-      getAuthToken().then((tok) =>
       fetch("/api/accounts/confirm", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ platform, unipileAccountId: accountId }),
-      }))
+      })
         .then(() => {
           queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
           toast({ title: `${platform.charAt(0).toUpperCase() + platform.slice(1)} connected!`, description: "Syncing your messages now." });
@@ -249,7 +234,6 @@ export default function Accounts() {
                           : "bg-border"
                       }`} />
                       <CardContent className="py-4 px-5 flex items-center justify-between gap-4">
-                        {/* Left */}
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center shrink-0">
                             <PlatformIcon platform={acc.platform} className="w-5 h-5" />
@@ -286,7 +270,6 @@ export default function Accounts() {
                           </div>
                         </div>
 
-                        {/* Right: controls */}
                         <div className="flex items-center gap-1.5 shrink-0">
                           <Button
                             variant={isLive ? "default" : "outline"}

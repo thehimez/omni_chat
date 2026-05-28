@@ -2,7 +2,6 @@ import { eq, and } from "drizzle-orm";
 import { db, connectedAccountsTable, conversationsTable, messagesTable } from "@workspace/db";
 import { logger } from "./logger";
 import { broadcastToUser } from "./sse-broadcaster";
-import { syncSlack } from "./slack-sync";
 
 const EMAIL_PLATFORMS = new Set(["gmail", "outlook"]);
 const CHAT_PLATFORMS = new Set(["whatsapp", "linkedin", "instagram", "telegram", "messenger", "twitter"]);
@@ -664,37 +663,7 @@ export async function syncAccount(
 
   if (!account[0]) throw new Error("Account not found");
 
-  const { platform, unipileAccountId, slackToken } = account[0];
-
-  // ── Slack: uses its own token, not Unipile ────────────────────────────────
-  if (platform === "slack") {
-    if (!slackToken) throw new Error("Slack account has no token — reconnect");
-    await db
-      .update(connectedAccountsTable)
-      .set({ status: "syncing" })
-      .where(eq(connectedAccountsTable.id, accountDbId));
-    let synced = 0;
-    try {
-      synced = await syncSlack(userId, accountDbId, slackToken);
-      await db
-        .update(connectedAccountsTable)
-        .set({ status: "connected", lastSyncAt: new Date(), messageCount: synced })
-        .where(eq(connectedAccountsTable.id, accountDbId));
-    } catch (err) {
-      // Rate-limited: keep status as "connected" so the UI doesn't show an error.
-      // Slack allows ~1 request/min on tier-1 methods; the next sync cycle will succeed.
-      const isRateLimit =
-        err instanceof Error &&
-        (err.message.includes("ratelimited") || err.message.includes("rate_limited"));
-      await db
-        .update(connectedAccountsTable)
-        .set({ status: isRateLimit ? "connected" : "error" })
-        .where(eq(connectedAccountsTable.id, accountDbId));
-      if (!isRateLimit) throw err;
-      logger.warn({ accountDbId }, "Slack sync skipped: rate limited — will retry next cycle");
-    }
-    return { synced, platform };
-  }
+  const { platform, unipileAccountId } = account[0];
 
   if (!unipileAccountId) throw new Error("Account has no Unipile ID — cannot sync");
 

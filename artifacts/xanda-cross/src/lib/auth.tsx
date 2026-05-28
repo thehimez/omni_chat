@@ -1,13 +1,8 @@
-import React from "react";
+import { useClerk } from "@clerk/react";
 
-type AuthContextType = {
-  signOut: () => void;
-};
-
-export const AuthContext = React.createContext<AuthContextType>({
-  signOut: () => window.location.reload(),
-});
-
-export function useAppAuth(): AuthContextType {
-  return React.useContext(AuthContext);
+export function useAppAuth() {
+  const { signOut } = useClerk();
+  return {
+    signOut: () => signOut({ redirectUrl: "/" }),
+  };
 }

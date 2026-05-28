@@ -1,4 +1,10 @@
-import { pgTable, text, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  integer,
+  boolean,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -17,11 +23,20 @@ export const conversationsTable = pgTable("conversations", {
   isRead: boolean("is_read").notNull().default(false),
   unreadCount: integer("unread_count").notNull().default(0),
   draftReply: text("draft_reply"),
-  lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+  lastMessageAt: timestamp("last_message_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
 });
 
-export const insertConversationSchema = createInsertSchema(conversationsTable).omit({ createdAt: true, updatedAt: true });
+export const insertConversationSchema = createInsertSchema(
+  conversationsTable,
+).omit({ createdAt: true, updatedAt: true });
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversationsTable.$inferSelect;

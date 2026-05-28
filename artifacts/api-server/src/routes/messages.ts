@@ -31,21 +31,7 @@ router.post("/messages/send", requireAuth, async (req: Request, res: Response): 
   let sentMessageId: string | null = null;
 
   try {
-    if (platform === "slack") {
-      const slackToken = process.env.SLACK_BOT_TOKEN;
-      if (!slackToken) {
-        res.status(503).json({ error: "Slack not configured" });
-        return;
-      }
-      const channel = conversation[0].externalId ?? "";
-      const slackResp = await fetch("https://slack.com/api/chat.postMessage", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${slackToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ channel, text: body }),
-      });
-      const slackData = await slackResp.json() as { ok: boolean; ts?: string };
-      if (slackData.ok) sentMessageId = slackData.ts ?? null;
-    } else {
+    {
       const unipileApiKey = process.env.UNIPILE_API_KEY;
       const unipileHost = process.env.UNIPILE_DSN ?? process.env.UNIPILE_HOST ?? "api19.unipile.com:14946";
       if (!unipileApiKey) {

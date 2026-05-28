@@ -7,11 +7,6 @@ import {
 } from "@workspace/api-client-react";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
-const DEV_TOKEN = "dev-bypass-xanda";
-
-function getAuthToken(): string {
-  return (window as any).__xandaToken ?? DEV_TOKEN;
-}
 
 export function useRealtime() {
   const queryClient = useQueryClient();
@@ -38,8 +33,9 @@ export function useRealtime() {
         esRef.current = null;
       }
 
-      const token = encodeURIComponent(getAuthToken());
-      const url = `${API_BASE}/api/events?token=${token}`;
+      // Clerk session cookie is sent automatically for same-origin EventSource requests.
+      // The Vite proxy forwards /api/* to the API server, making it appear same-origin.
+      const url = `${API_BASE}/api/events`;
 
       let es: EventSource;
       try {
@@ -50,7 +46,7 @@ export function useRealtime() {
       esRef.current = es;
 
       es.addEventListener("connected", () => {
-        delayRef.current = 1000; // reset to fast reconnect after a successful connect
+        delayRef.current = 1000;
       });
 
       es.addEventListener("new_message", (e: MessageEvent) => {
@@ -74,19 +70,15 @@ export function useRealtime() {
       });
 
       es.addEventListener("sync_complete", () => {
-        // Background sync finished — refresh the full inbox
         invalidateConversations();
         queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
       });
 
       es.addEventListener("account_sync_started", () => {
-        // An account just started syncing — refresh the accounts list so the
-        // "syncing" pill appears without polling.
         queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
       });
 
       es.addEventListener("account_sync_finished", () => {
-        // Sync finished — refresh inbox + accounts.
         invalidateConversations();
         queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
       });
@@ -99,7 +91,6 @@ export function useRealtime() {
         es.close();
         esRef.current = null;
         if (!mountedRef.current) return;
-        // Linear backoff capped at 10s (not exponential) so we reconnect quickly
         const delay = Math.min(delayRef.current, 10000);
         delayRef.current = delay + 1000;
         reconnectRef.current = setTimeout(connect, delay);

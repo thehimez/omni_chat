@@ -21,7 +21,11 @@ function getOpenAIClient(): OpenAI {
   return new OpenAI({ baseURL, apiKey });
 }
 
-async function callOpenAI(systemPrompt: string, userMessage: string, conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = []): Promise<string> {
+async function callOpenAI(
+  systemPrompt: string,
+  userMessage: string,
+  conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = [],
+): Promise<string> {
   try {
     const openai = getOpenAIClient();
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -63,7 +67,7 @@ router.post("/xan/chat", requireAuth, async (req: Request, res: Response): Promi
     content: m.content,
   }));
 
-  const systemPrompt = `You are Xan, an AI assistant built into the Xanda Cross unified inbox platform. You help users manage their communications across Gmail, Outlook, WhatsApp, LinkedIn, Instagram, Telegram, and Slack. You can summarize conversations, suggest replies, prioritize messages, and answer questions about the user's inbox. Be concise, helpful, and professional. Today's date: ${new Date().toDateString()}.`;
+  const systemPrompt = `You are Xan, an AI assistant built into the Xanda Cross unified inbox platform. You help users manage their communications across Gmail, Outlook, WhatsApp, LinkedIn, Instagram, and Telegram. You can summarize conversations, suggest replies, prioritize messages, and answer questions about the user's inbox. Be concise, helpful, and professional. Today's date: ${new Date().toDateString()}.`;
 
   const contextualMessage = conversationId
     ? `[Context: User is viewing conversation ${conversationId}]\n\n${message}`

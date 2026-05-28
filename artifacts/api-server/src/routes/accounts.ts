@@ -15,7 +15,6 @@ import { requireAuth } from "../middleware/auth";
 import { logger } from "../lib/logger";
 import { syncAccount } from "../lib/unipile-sync";
 import { broadcastToUser } from "../lib/sse-broadcaster";
-import { syncSlack } from "../lib/slack-sync";
 
 const router: IRouter = Router();
 
@@ -68,27 +67,6 @@ router.post("/accounts/connect", requireAuth, async (req: Request, res: Response
     redirectBase ??
     process.env.APP_URL ??
     (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "https://xandacross.com");
-
-  if (platform === "slack") {
-    const slackClientId = process.env.SLACK_CLIENT_ID;
-    if (!slackClientId) {
-      res.status(503).json({ error: "Slack integration not configured" });
-      return;
-    }
-    const redirectUri = `${appUrl}/api/accounts/slack/callback`;
-    // Bot scopes: read + history for all conversation types, send messages, user info
-    const scopes = [
-      "channels:read", "channels:history",
-      "groups:read", "groups:history",
-      "im:read", "im:history",
-      "mpim:read", "mpim:history",
-      "chat:write",
-      "users:read", "users:read.email",
-    ].join(",");
-    const authUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}`;
-    res.json(ConnectAccountResponse.parse({ authUrl, connectionId: null, status: "pending" }));
-    return;
-  }
 
   const unipileApiKey = process.env.UNIPILE_API_KEY;
   const unipileHost = process.env.UNIPILE_DSN ?? process.env.UNIPILE_HOST ?? "api19.unipile.com:14946";
@@ -198,91 +176,6 @@ router.post("/accounts/confirm", requireAuth, async (req: Request, res: Response
   } catch (err) {
     req.log.error({ err }, "Account confirm error");
     res.status(500).json({ error: "Internal error" });
-  }
-});
-
-// ── Slack OAuth callback (no auth middleware — Slack redirects here directly) ──
-router.get("/accounts/slack/callback", async (req: Request, res: Response): Promise<void> => {
-  const code = req.query.code as string | undefined;
-  const error = req.query.error as string | undefined;
-
-  const appUrl =
-    process.env.APP_URL ??
-    (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "");
-
-  if (error || !code) {
-    res.redirect(`${appUrl}/accounts?error=slack_denied`);
-    return;
-  }
-
-  const clientId = process.env.SLACK_CLIENT_ID;
-  const clientSecret = process.env.SLACK_CLIENT_SECRET;
-  if (!clientId || !clientSecret) {
-    res.redirect(`${appUrl}/accounts?error=slack_not_configured`);
-    return;
-  }
-
-  try {
-    const redirectUri = `${appUrl}/api/accounts/slack/callback`;
-    const tokenResp = await fetch("https://slack.com/api/oauth.v2.access", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-        redirect_uri: redirectUri,
-      }),
-    });
-    const tokenData = await tokenResp.json() as {
-      ok: boolean;
-      error?: string;
-      access_token?: string;
-      bot_user_id?: string;
-      team?: { name?: string; id?: string };
-      authed_user?: { id?: string };
-    };
-
-    if (!tokenData.ok || !tokenData.access_token) {
-      logger.error({ error: tokenData.error }, "Slack OAuth token exchange failed");
-      res.redirect(`${appUrl}/accounts?error=slack_auth_failed`);
-      return;
-    }
-
-    const token = tokenData.access_token;
-    const teamName = tokenData.team?.name ?? "Slack";
-    const teamId = tokenData.team?.id ?? "unknown";
-
-    // Upsert connected account — store token in slackToken column
-    const accountId = `acc_slack_${teamId}`;
-    await db
-      .insert(connectedAccountsTable)
-      .values({
-        id: accountId,
-        userId: "demo_user_xanda", // demo mode — single user
-        platform: "slack",
-        accountLabel: teamName,
-        slackToken: token,
-        status: "connected",
-        lastSyncAt: new Date(),
-        messageCount: 0,
-      })
-      .onConflictDoUpdate({
-        target: [connectedAccountsTable.id],
-        set: { slackToken: token, status: "connected", lastSyncAt: new Date() },
-      });
-
-    logger.info({ accountId, teamName }, "Slack account connected");
-
-    // Kick off background sync
-    syncSlack("demo_user_xanda", accountId, token).catch((err) => {
-      logger.warn({ err, accountId }, "Slack initial sync failed");
-    });
-
-    res.redirect(`${appUrl}/accounts?connected=slack`);
-  } catch (err) {
-    logger.error({ err }, "Slack OAuth callback error");
-    res.redirect(`${appUrl}/accounts?error=slack_callback_failed`);
   }
 });
 

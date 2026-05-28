@@ -24,7 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { useAppAuth } from "@/lib/auth";
 
 const navItems = [
-  { href: "/", label: "Briefing", icon: LayoutDashboard },
+  { href: "/briefing", label: "Briefing", icon: LayoutDashboard },
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/xan", label: "Xan AI", icon: Bot },
   { href: "/search", label: "Search", icon: Search },
