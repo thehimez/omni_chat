@@ -55,8 +55,20 @@ async function slackGet<T>(
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = (await resp.json()) as T & { ok: boolean; error?: string };
-  if (!data.ok) throw new Error(`Slack API ${method}: ${data.error ?? "unknown error"}`);
+  if (!data.ok) {
+    const err = new Error(`Slack API ${method}: ${data.error ?? "unknown error"}`);
+    (err as any).slackError = data.error;
+    throw err;
+  }
   return data;
+}
+
+/** Returns true if this error is a Slack rate-limit — caller should back off, not fail */
+function isSlackRateLimit(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    ((err as any).slackError === "ratelimited" || err.message.includes("ratelimited"))
+  );
 }
 
 // ─── User profile cache (per sync run) ───────────────────────────────────────

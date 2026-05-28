@@ -44,6 +44,12 @@ export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
 }
 
+/** Returns the current auth token (or empty string if none configured). */
+export async function getAuthToken(): Promise<string> {
+  const t = await _authTokenGetter?.();
+  return t ?? "";
+}
+
 function isRequest(input: RequestInfo | URL): input is Request {
   return typeof Request !== "undefined" && input instanceof Request;
 }

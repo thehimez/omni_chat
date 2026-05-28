@@ -681,11 +681,17 @@ export async function syncAccount(
         .set({ status: "connected", lastSyncAt: new Date(), messageCount: synced })
         .where(eq(connectedAccountsTable.id, accountDbId));
     } catch (err) {
+      // Rate-limited: keep status as "connected" so the UI doesn't show an error.
+      // Slack allows ~1 request/min on tier-1 methods; the next sync cycle will succeed.
+      const isRateLimit =
+        err instanceof Error &&
+        (err.message.includes("ratelimited") || err.message.includes("rate_limited"));
       await db
         .update(connectedAccountsTable)
-        .set({ status: "error" })
+        .set({ status: isRateLimit ? "connected" : "error" })
         .where(eq(connectedAccountsTable.id, accountDbId));
-      throw err;
+      if (!isRateLimit) throw err;
+      logger.warn({ accountDbId }, "Slack sync skipped: rate limited — will retry next cycle");
     }
     return { synced, platform };
   }

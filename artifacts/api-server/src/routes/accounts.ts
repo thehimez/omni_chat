@@ -32,10 +32,12 @@ const PLATFORM_TO_UNIPILE_PROVIDER: Record<string, string> = {
 
 router.get("/accounts", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const user = (req as any).user;
+  const { asc } = await import("drizzle-orm");
   const accounts = await db
     .select()
     .from(connectedAccountsTable)
-    .where(eq(connectedAccountsTable.userId, user.id));
+    .where(eq(connectedAccountsTable.userId, user.id))
+    .orderBy(asc(connectedAccountsTable.createdAt));
 
   res.json(GetConnectedAccountsResponse.parse({
     accounts: accounts.map((a) => ({
