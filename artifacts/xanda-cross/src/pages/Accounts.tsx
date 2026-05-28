@@ -5,22 +5,20 @@ import {
   useDisconnectAccount,
   getGetConnectedAccountsQueryKey,
 } from "@workspace/api-client-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlatformIcon } from "@/components/platform-icon";
-import { RefreshCw, Unlink, Link2, Plus, AlertCircle, Play, Pause } from "lucide-react";
+import { PlatformIcon, getPlatformLabel } from "@/components/platform-icon";
+import { RefreshCw, Unlink, Plus, AlertCircle, Play, Pause, Link2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { motion } from "framer-motion";
 
 const PLATFORMS = ["gmail", "outlook", "whatsapp", "linkedin", "telegram", "instagram"];
 const LIVE_SYNC_INTERVAL_MS = 30_000;
 const ACCOUNTS_REFRESH_MS = 60_000;
 const STORAGE_KEY = "xanda_live_sync_paused_v3";
 
-// ── Module-level live state ───────────────────────────────────────────────────
 const _live = {
   accounts: [] as Array<{ id: string; platform: string }>,
   paused: new Set<string>(),
@@ -39,8 +37,6 @@ function savePaused(s: Set<string>) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify([...s]));
 }
 
-// Cookie-based auth: browser includes Clerk session cookie automatically.
-// No Authorization header needed.
 async function doSync(accountId: string): Promise<void> {
   try {
     await fetch(`/api/accounts/${accountId}/sync`, {
@@ -84,19 +80,17 @@ export default function Accounts() {
         });
       }
     };
-
     const boot = setTimeout(triggerAll, 1500);
     const syncTimer = setInterval(triggerAll, LIVE_SYNC_INTERVAL_MS);
     const refreshTimer = setInterval(() => refetch(), ACCOUNTS_REFRESH_MS);
     const tickTimer = setInterval(() => setTick((n) => n + 1), 15_000);
-
     return () => {
       clearTimeout(boot);
       clearInterval(syncTimer);
       clearInterval(refreshTimer);
       clearInterval(tickTimer);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleLive = (id: string) => {
@@ -106,7 +100,11 @@ export default function Accounts() {
         next.delete(id);
         setSyncingIds((s) => new Set(s).add(id));
         doSync(id).finally(() =>
-          setSyncingIds((s) => { const n = new Set(s); n.delete(id); return n; })
+          setSyncingIds((s) => {
+            const n = new Set(s);
+            n.delete(id);
+            return n;
+          }),
         );
       } else {
         next.add(id);
@@ -119,9 +117,14 @@ export default function Accounts() {
   const manualSync = (id: string) => {
     if (syncingIds.has(id)) return;
     setSyncingIds((s) => new Set(s).add(id));
-    doSync(id).then(() => toast({ title: "Synced", description: "Latest messages fetched." }))
+    doSync(id)
+      .then(() => toast({ title: "Synced", description: "Latest messages fetched." }))
       .finally(() =>
-        setSyncingIds((s) => { const n = new Set(s); n.delete(id); return n; })
+        setSyncingIds((s) => {
+          const n = new Set(s);
+          n.delete(id);
+          return n;
+        }),
       );
   };
 
@@ -144,27 +147,32 @@ export default function Accounts() {
       })
         .then(() => {
           queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
-          toast({ title: `${platform.charAt(0).toUpperCase() + platform.slice(1)} connected!`, description: "Syncing your messages now." });
+          toast({
+            title: `${platform.charAt(0).toUpperCase() + platform.slice(1)} connected!`,
+            description: "Syncing your messages now.",
+          });
         })
-        .catch(() => queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() }));
+        .catch(() =>
+          queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() }),
+        );
       window.history.replaceState({}, "", window.location.pathname);
     } else if (platform) {
       queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
       toast({ title: "Account connected!", description: "Your account is now syncing." });
       window.history.replaceState({}, "", window.location.pathname);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleConnect = (platform: string) => {
     const popup = window.open("", "_blank", "width=620,height=800,scrollbars=yes,resizable=yes");
     if (popup) {
       popup.document.write(
-        `<html><body style="background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px">
+        `<html><body style="background:#F5F8FB;color:#1D1D1F;font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px">
           <div style="width:40px;height:40px;border:3px solid #6366f1;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite"></div>
           <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-          <p style="margin:0;font-size:15px">Connecting ${platform}…</p>
-        </body></html>`
+          <p style="margin:0;font-size:15px;color:#6E6E73">Connecting ${platform}…</p>
+        </body></html>`,
       );
     }
     connectMutation.mutate(
@@ -178,169 +186,207 @@ export default function Accounts() {
           popup?.close();
           toast({ title: "Connection failed", description: "Could not start auth.", variant: "destructive" });
         },
-      }
+      },
     );
   };
 
   const handleDisconnect = (id: string) => {
-    disconnectMutation.mutate({ id }, {
-      onSuccess: () => {
-        toast({ title: "Account disconnected" });
-        queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
+    disconnectMutation.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          toast({ title: "Account disconnected" });
+          queryClient.invalidateQueries({ queryKey: getGetConnectedAccountsQueryKey() });
+        },
       },
-    });
+    );
   };
 
   const liveCount = (data?.accounts ?? []).filter((a) => !pausedIds.has(a.id)).length;
   const connectedPlatforms = new Set(data?.accounts?.map((a) => a.platform) ?? []);
 
+  const stagger = {
+    container: { hidden: {}, show: { transition: { staggerChildren: 0.06 } } },
+    item: { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.25 } } },
+  };
+
   return (
-    <div className="h-full flex flex-col bg-background">
-      <header className="h-14 border-b flex items-center px-6 shrink-0 bg-card justify-between">
-        <h1 className="font-semibold">Connected Accounts</h1>
-        {liveCount > 0 && (
-          <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            {liveCount} account{liveCount !== 1 ? "s" : ""} syncing live · every 30s
+    <div className="h-full overflow-y-auto p-6">
+      <motion.div
+        variants={stagger.container}
+        initial="hidden"
+        animate="show"
+        className="max-w-3xl mx-auto space-y-6"
+      >
+        {/* Header */}
+        <motion.div variants={stagger.item} className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Connected Accounts</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Manage your messaging integrations</p>
           </div>
-        )}
-      </header>
-
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-4xl mx-auto space-y-8">
-
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold tracking-tight">Active Connections</h2>
-
-            {isLoading ? (
-              <div className="grid gap-3">
-                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
-              </div>
-            ) : data?.accounts && data.accounts.length > 0 ? (
-              <div className="grid gap-3">
-                {data.accounts.map((acc) => {
-                  const isLive = !pausedIds.has(acc.id);
-                  const isSyncing = syncingIds.has(acc.id);
-
-                  return (
-                    <Card key={acc.id} className="overflow-hidden">
-                      <div className={`h-0.5 w-full transition-all ${
-                        isSyncing ? "bg-primary animate-pulse"
-                          : isLive ? "bg-emerald-500/30"
-                          : acc.status === "error" ? "bg-destructive/50"
-                          : "bg-border"
-                      }`} />
-                      <CardContent className="py-4 px-5 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center shrink-0">
-                            <PlatformIcon platform={acc.platform} className="w-5 h-5" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-sm">{acc.displayName}</span>
-                              {isLive ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                                  <span className="relative flex h-1.5 w-1.5">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-                                  </span>
-                                  Live
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
-                                  <Pause className="w-2 h-2" /> Paused
-                                </span>
-                              )}
-                              {acc.status === "error" && (
-                                <Badge variant="destructive" className="text-[10px] h-4 px-1.5">
-                                  <AlertCircle className="w-2.5 h-2.5 mr-1" /> Error
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {isSyncing
-                                ? "Syncing…"
-                                : acc.lastSyncAt
-                                ? `Last synced ${formatDistanceToNow(new Date(acc.lastSyncAt), { addSuffix: true })}`
-                                : "Never synced"}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <Button
-                            variant={isLive ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => toggleLive(acc.id)}
-                            className={`gap-1.5 h-8 text-xs px-3 ${isLive ? "bg-emerald-600 hover:bg-emerald-700 text-white border-0" : ""}`}
-                          >
-                            {isLive
-                              ? <><Pause className="w-3 h-3" /> Pause</>
-                              : <><Play className="w-3 h-3" /> Resume</>}
-                          </Button>
-                          <Button
-                            variant="ghost" size="icon" className="h-8 w-8"
-                            onClick={() => manualSync(acc.id)}
-                            disabled={isSyncing}
-                            title="Sync now"
-                          >
-                            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-                          </Button>
-                          <Button
-                            variant="ghost" size="icon"
-                            className="h-8 w-8 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => handleDisconnect(acc.id)}
-                            disabled={disconnectMutation.isPending}
-                            title="Disconnect"
-                          >
-                            <Unlink className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            ) : (
-              <Card className="border-dashed bg-accent/30">
-                <CardContent className="p-8 text-center text-muted-foreground">
-                  <Link2 className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                  <p className="font-medium mb-1">No accounts connected yet</p>
-                  <p className="text-sm">Connect a platform below to get started.</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          <div className="space-y-4 pt-4 border-t">
-            <h2 className="text-xl font-semibold tracking-tight">Available Platforms</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {PLATFORMS.filter((p) => !connectedPlatforms.has(p)).map((platform) => (
-                <Card key={platform} className="hover:border-primary/50 transition-colors">
-                  <CardContent className="p-6 flex flex-col items-center text-center gap-3">
-                    <PlatformIcon platform={platform} className="w-9 h-9" />
-                    <h3 className="font-semibold text-sm capitalize">{platform.replace("_", " ")}</h3>
-                    <Button
-                      variant="secondary" size="sm" className="w-full"
-                      disabled={connectMutation.isPending}
-                      onClick={() => handleConnect(platform)}
-                    >
-                      <Plus className="w-3.5 h-3.5 mr-1.5" /> Connect
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-              {PLATFORMS.every((p) => connectedPlatforms.has(p)) && (
-                <p className="col-span-full text-sm text-muted-foreground text-center py-4">All platforms connected!</p>
-              )}
+          {liveCount > 0 && (
+            <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium bg-emerald-50 px-3 py-2 rounded-full border border-emerald-200/60">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              {liveCount} live · every 30s
             </div>
-          </div>
+          )}
+        </motion.div>
 
-        </div>
-      </div>
+        {/* Active connections */}
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2].map((i) => (
+              <Skeleton key={i} className="h-20 rounded-3xl" />
+            ))}
+          </div>
+        ) : data?.accounts && data.accounts.length > 0 ? (
+          <motion.div variants={stagger.item} className="space-y-3">
+            {data.accounts.map((acc) => {
+              const isLive = !pausedIds.has(acc.id);
+              const isSyncing = syncingIds.has(acc.id);
+
+              return (
+                <motion.div
+                  key={acc.id}
+                  whileHover={{ y: -1 }}
+                  className="bg-white/80 backdrop-blur-xl rounded-3xl border border-white/70 shadow-[0_2px_16px_rgba(0,0,0,0.05)] overflow-hidden"
+                >
+                  <div
+                    className={`h-0.5 w-full transition-all ${
+                      isSyncing
+                        ? "bg-indigo-400 animate-pulse"
+                        : isLive
+                          ? "bg-emerald-400/50"
+                          : acc.status === "error"
+                            ? "bg-red-400/50"
+                            : "bg-gray-100"
+                    }`}
+                  />
+                  <div className="px-5 py-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="w-12 h-12 rounded-2xl bg-gray-50/80 flex items-center justify-center shrink-0 border border-gray-100">
+                        <PlatformIcon platform={acc.platform} className="w-7 h-7" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                          <span className="font-semibold text-gray-900 text-sm">
+                            {acc.displayName}
+                          </span>
+                          {isLive ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/60">
+                              <span className="relative flex h-1.5 w-1.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                              </span>
+                              Live
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200/60">
+                              <Pause className="w-2 h-2" /> Paused
+                            </span>
+                          )}
+                          {acc.status === "error" && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-200/60">
+                              <AlertCircle className="w-2.5 h-2.5" /> Error
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400">
+                          {isSyncing
+                            ? "Syncing…"
+                            : acc.lastSyncAt
+                              ? `Last synced ${formatDistanceToNow(new Date(acc.lastSyncAt), { addSuffix: true })}`
+                              : "Never synced"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => toggleLive(acc.id)}
+                        className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-colors ${
+                          isLive
+                            ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200/60"
+                            : "bg-gray-100 text-gray-500 hover:bg-gray-200 border border-gray-200/60"
+                        }`}
+                      >
+                        {isLive ? (
+                          <><Pause className="w-3 h-3" /> Pause</>
+                        ) : (
+                          <><Play className="w-3 h-3" /> Resume</>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => manualSync(acc.id)}
+                        disabled={isSyncing}
+                        className="w-8 h-8 rounded-xl bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors border border-gray-200/60"
+                        title="Sync now"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+                      </button>
+                      <button
+                        onClick={() => handleDisconnect(acc.id)}
+                        disabled={disconnectMutation.isPending}
+                        className="w-8 h-8 rounded-xl bg-red-50 hover:bg-red-100 flex items-center justify-center text-red-400 hover:text-red-500 transition-colors border border-red-200/60"
+                        title="Disconnect"
+                      >
+                        <Unlink className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        ) : (
+          <motion.div
+            variants={stagger.item}
+            className="bg-white/60 backdrop-blur-xl rounded-3xl border border-white/70 border-dashed p-10 text-center"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+              <Link2 className="w-6 h-6 text-gray-300" />
+            </div>
+            <p className="font-medium text-gray-500 text-sm mb-1">No accounts connected yet</p>
+            <p className="text-xs text-gray-400">Connect a platform below to get started.</p>
+          </motion.div>
+        )}
+
+        {/* Available platforms */}
+        {PLATFORMS.some((p) => !connectedPlatforms.has(p)) && (
+          <motion.div variants={stagger.item} className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider px-1">
+              Available Platforms
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {PLATFORMS.filter((p) => !connectedPlatforms.has(p)).map((platform) => (
+                <motion.div
+                  key={platform}
+                  whileHover={{ y: -3, boxShadow: "0 12px 32px rgba(0,0,0,0.1)" }}
+                  className="bg-white/80 backdrop-blur-xl rounded-3xl border border-white/70 shadow-[0_2px_16px_rgba(0,0,0,0.05)] p-6 flex flex-col items-center gap-3 cursor-pointer transition-all"
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-gray-50/80 flex items-center justify-center border border-gray-100/80">
+                    <PlatformIcon platform={platform} className="w-9 h-9" />
+                  </div>
+                  <span className="font-semibold text-gray-800 text-sm">
+                    {getPlatformLabel(platform)}
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => handleConnect(platform)}
+                    disabled={connectMutation.isPending}
+                    className="w-full rounded-xl text-xs gap-1.5 bg-gradient-to-r from-indigo-500 to-violet-600 border-0 text-white hover:from-indigo-600 hover:to-violet-700 shadow-sm"
+                  >
+                    <Plus className="w-3 h-3" /> Connect
+                  </Button>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
     </div>
   );
 }

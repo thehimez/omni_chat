@@ -1,0 +1,276 @@
+Redesign the complete XANDA user application UI to match the modern minimal aesthetic of the provided reference image (the light glassmorphism unified inbox UI). Use the exact same design language, spacing, rounded corners, soft shadows, bluish gradient tones, icon placements, and layout hierarchy.
+
+GOAL:
+Transform the current dark dashboard UI into a clean modern unified communication workspace inspired by the provided reference image.
+
+--------------------------------------------------
+GLOBAL DESIGN SYSTEM
+--------------------------------------------------
+
+Use this exact visual direction everywhere:
+
+- Soft bluish-white gradient background
+- Glassmorphism cards
+- Rounded corners everywhere (20px–28px radius)
+- Very subtle shadows
+- Minimal borders
+- Smooth spacing and padding
+- Thin clean typography
+- Apple-like/macOS inspired interface
+- Floating containers
+- Soft hover animations
+- Consistent icon sizing
+- Calm futuristic UI
+
+COLOR PALETTE:
+- Background: #F5F8FB
+- Secondary background: #EEF3F7
+- Card background: rgba(255,255,255,0.75)
+- Border: rgba(255,255,255,0.4)
+- Primary text: #1D1D1F
+- Secondary text: #6E6E73
+- Accent blue glow: #BFDFFF
+- Accent gradient:
+  linear-gradient(
+    135deg,
+    rgba(191,223,255,0.45),
+    rgba(230,240,255,0.25)
+  )
+
+Use subtle blur:
+backdrop-filter: blur(18px);
+
+--------------------------------------------------
+REMOVE UNNECESSARY SIDEBAR ITEMS
+--------------------------------------------------
+
+CURRENTLY REMOVE:
+- Admin
+- Billing
+- Theme
+- System Status
+- Extra unnecessary menu clutter
+
+Admin panel should NEVER appear inside user app.
+
+ONLY KEEP:
+- Unified Inbox
+- Search
+- Contacts
+- Accounts
+
+Everything else must go under a settings drawer/modal.
+
+--------------------------------------------------
+LEFT SIDEBAR REDESIGN
+--------------------------------------------------
+
+Redesign sidebar exactly like reference image:
+
+TOP:
+- Square XANDA logo container
+- Rounded square icon
+- Minimal branding
+
+CENTER:
+Only connected app icons should appear vertically:
+- Gmail
+- WhatsApp
+- Telegram
+- Instagram
+- LinkedIn
+- Outlook
+etc.
+
+RULE:
+Only show apps that user has connected.
+
+If Gmail + WhatsApp are connected:
+ONLY SHOW those icons.
+
+When user clicks an app icon:
+- Filter inbox messages only from that platform.
+
+When user clicks “Unified Inbox”:
+- Show all messages from all connected apps.
+
+BOTTOM:
+- Small square user profile avatar
+- Settings icon below avatar
+
+Inside settings modal:
+- Profile
+- Preferences
+- Billing
+- Theme
+- Admin panel link (ONLY if role === admin)
+
+--------------------------------------------------
+ADMIN PANEL RULE
+--------------------------------------------------
+
+DO NOT show admin navigation inside normal user sidebar.
+
+Instead:
+- If user is admin,
+show admin access INSIDE settings modal only.
+
+Create dedicated admin route:
+"/admin"
+
+Do not expose admin menu in main navigation.
+
+--------------------------------------------------
+UNIFIED INBOX REDESIGN
+--------------------------------------------------
+
+Inbox UI should match reference image exactly.
+
+FEATURES:
+- Floating search bar at top
+- Rounded search container
+- Soft glass background
+- XAN AI search integrated
+
+Search should:
+- Search entire communication database
+- Search contacts
+- Search messages
+- Search attachments
+- Search all connected platforms
+
+PLACEHOLDER:
+“Start typing to ask or search XAN”
+
+--------------------------------------------------
+MESSAGE LIST DESIGN
+--------------------------------------------------
+
+Each inbox message card should have:
+
+LEFT:
+- Rounded user avatar
+
+CENTER:
+- User name
+- Timestamp
+- Message preview
+
+RIGHT:
+- Platform icon
+(Gmail / Telegram / WhatsApp etc.)
+
+Message cards:
+- Floating
+- Rounded 24px
+- Slight hover lift
+- Soft shadows
+
+Spacing should match reference image closely.
+
+--------------------------------------------------
+CONNECTED APPS BEHAVIOR
+--------------------------------------------------
+
+If user clicks:
+- Gmail icon → only Gmail messages
+- WhatsApp icon → only WhatsApp messages
+- Telegram icon → only Telegram messages
+
+Unified Inbox:
+- Combines everything together
+
+--------------------------------------------------
+CONNECTED ACCOUNTS PAGE REDESIGN
+--------------------------------------------------
+
+Redesign accounts page into modern card layout.
+
+Each platform card:
+- Rounded 24px
+- Minimal icon
+- Floating glass effect
+- Large platform logo
+- Clean Connect button
+
+Cards should feel modern and flexible.
+
+--------------------------------------------------
+ANIMATIONS
+--------------------------------------------------
+
+Add:
+- Framer Motion animations
+- Smooth hover states
+- Soft transitions
+- Sidebar icon animations
+- Card hover elevation
+- Search bar focus glow
+
+--------------------------------------------------
+RESPONSIVE BEHAVIOR
+--------------------------------------------------
+
+Desktop-first.
+
+On mobile:
+- Sidebar collapses
+- Floating bottom nav
+- Smooth gestures
+
+--------------------------------------------------
+TYPOGRAPHY
+--------------------------------------------------
+
+Use:
+font-family:
+- Inter
+or
+- SF Pro Display
+
+Typography should be:
+- Thin
+- Elegant
+- Modern
+
+--------------------------------------------------
+IMPORTANT
+--------------------------------------------------
+
+The UI should visually replicate the exact style of the provided reference image:
+- same corner radius
+- same spacing
+- same softness
+- same bluish glow
+- same floating panels
+- same modern Apple-like minimalism
+
+The final product should feel:
+- futuristic
+- aesthetic
+- premium
+- clean
+- distraction-free
+
+Avoid enterprise dashboard clutter completely.
+
+--------------------------------------------------
+TECH STACK
+--------------------------------------------------
+
+Use:
+- React
+- TailwindCSS
+- Framer Motion
+- Lucide icons
+- Radix UI / shadcn UI
+
+Create reusable components for:
+- Sidebar
+- Inbox cards
+- Search bar
+- Platform filters
+- Settings modal
+- Connected app cards
+
+Ensure the codebase is modular and production-ready.
