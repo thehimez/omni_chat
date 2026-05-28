@@ -2,6 +2,7 @@ import { eq, and } from "drizzle-orm";
 import { db, connectedAccountsTable, conversationsTable, messagesTable } from "@workspace/db";
 import { logger } from "./logger";
 import { broadcastToUser } from "./sse-broadcaster";
+import { syncSlack } from "./slack-sync";
 
 const EMAIL_PLATFORMS = new Set(["gmail", "outlook"]);
 const CHAT_PLATFORMS = new Set(["whatsapp", "linkedin", "instagram", "telegram", "messenger", "twitter"]);
@@ -663,7 +664,32 @@ export async function syncAccount(
 
   if (!account[0]) throw new Error("Account not found");
 
-  const { platform, unipileAccountId } = account[0];
+  const { platform, unipileAccountId, slackToken } = account[0];
+
+  // ── Slack: uses its own token, not Unipile ────────────────────────────────
+  if (platform === "slack") {
+    if (!slackToken) throw new Error("Slack account has no token — reconnect");
+    await db
+      .update(connectedAccountsTable)
+      .set({ status: "syncing" })
+      .where(eq(connectedAccountsTable.id, accountDbId));
+    let synced = 0;
+    try {
+      synced = await syncSlack(userId, accountDbId, slackToken);
+      await db
+        .update(connectedAccountsTable)
+        .set({ status: "connected", lastSyncAt: new Date(), messageCount: synced })
+        .where(eq(connectedAccountsTable.id, accountDbId));
+    } catch (err) {
+      await db
+        .update(connectedAccountsTable)
+        .set({ status: "error" })
+        .where(eq(connectedAccountsTable.id, accountDbId));
+      throw err;
+    }
+    return { synced, platform };
+  }
+
   if (!unipileAccountId) throw new Error("Account has no Unipile ID — cannot sync");
 
   await db

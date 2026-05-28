@@ -6,6 +6,7 @@ import { logger } from "../lib/logger";
 import { appendWebhookEvent } from "../lib/webhook-log";
 import { broadcastToUser } from "../lib/sse-broadcaster";
 import { syncChatById } from "../lib/unipile-sync";
+import { handleSlackEvent } from "../lib/slack-sync";
 
 const router: IRouter = Router();
 
@@ -408,6 +409,62 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
   }
 
   res.json(UnipileWebhookResponse.parse({ status: "ok" }));
+});
+
+// ── Slack Events API webhook ──────────────────────────────────────────────────
+// Slack sends events here for real-time message delivery.
+// The Events URL must be configured in the Slack App's "Event Subscriptions" page.
+// Subscribed bot events: message.channels, message.groups, message.im, message.mpim
+router.post("/webhooks/slack", async (req: Request, res: Response): Promise<void> => {
+  const body = req.body as {
+    type?: string;
+    challenge?: string;
+    team_id?: string;
+    event?: Record<string, unknown>;
+  };
+
+  // 1. URL verification challenge — Slack sends this when you first configure the Events URL
+  if (body.type === "url_verification") {
+    res.json({ challenge: body.challenge });
+    return;
+  }
+
+  // 2. Ignore non-event-callback payloads
+  if (body.type !== "event_callback" || !body.event) {
+    res.json({ status: "ok" });
+    return;
+  }
+
+  // Respond immediately — Slack requires a 200 within 3 seconds
+  res.json({ status: "ok" });
+
+  // Find the Slack account in our DB by team_id
+  try {
+    const teamId = body.team_id;
+    if (!teamId) return;
+
+    const accountId = `acc_slack_${teamId}`;
+    const accounts = await db
+      .select()
+      .from(connectedAccountsTable)
+      .where(eq(connectedAccountsTable.id, accountId))
+      .limit(1);
+
+    if (!accounts[0]?.slackToken) {
+      logger.warn({ teamId }, "Slack event: no matching account found");
+      return;
+    }
+
+    const account = accounts[0];
+    await handleSlackEvent(
+      account.userId,
+      account.id,
+      account.slackToken,
+      body.event,
+    );
+  } catch (err) {
+    logger.error({ err }, "Slack event handler error");
+  }
 });
 
 export default router;
