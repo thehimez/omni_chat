@@ -34,6 +34,8 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { formatInboxTimestamp } from "@/lib/format-time";
 import { usePlatformFilter } from "@/lib/platform-filter-context";
+import { XanMemoryCard } from "@/components/XanMemoryCard";
+import { Link } from "wouter";
 
 function Avatar({ name, src }: { name: string; src?: string | null }) {
   if (src) {
@@ -402,11 +404,25 @@ function ConversationView({ id }: { id: string }) {
       <div className="px-6 py-4 border-b border-gray-100/80 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <Avatar name={conv.contactName} src={conv.contactAvatarUrl} />
+            {conv.contactId ? (
+              <Link href={`/contacts/${conv.contactId}`}>
+                <div className="cursor-pointer hover:opacity-80 transition-opacity">
+                  <Avatar name={conv.contactName} src={conv.contactAvatarUrl} />
+                </div>
+              </Link>
+            ) : (
+              <Avatar name={conv.contactName} src={conv.contactAvatarUrl} />
+            )}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-gray-900">{conv.contactName}</h2>
+              {conv.contactId ? (
+                <Link href={`/contacts/${conv.contactId}`}>
+                  <h2 className="font-semibold text-gray-900 hover:text-indigo-600 transition-colors cursor-pointer">{conv.contactName}</h2>
+                </Link>
+              ) : (
+                <h2 className="font-semibold text-gray-900">{conv.contactName}</h2>
+              )}
               <PlatformIcon platform={conv.platform} className="w-3.5 h-3.5" />
             </div>
             {conv.topicLabel && (
@@ -457,6 +473,9 @@ function ConversationView({ id }: { id: string }) {
           })}
         </div>
       </ScrollArea>
+
+      {/* Xan Memory Card */}
+      <XanMemoryCard conversationId={id} contactId={conv.contactId} />
 
       {/* Reply area */}
       <div className="px-5 py-4 border-t border-gray-100/80 shrink-0">

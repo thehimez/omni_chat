@@ -2,3 +2,4 @@
 - [Xanda inbox realtime](xanda-realtime.md) — SSE broadcaster pattern, how navigation/optimistic updates work, and the markRead flow
 - [WhatsApp contact name resolution](whatsapp-contact-resolution.md) — chat.name fallback used because Unipile /api/v1/users returns 404; whatsapp_contacts table ready for when it works.
 - [Xanda email mode architecture](xanda-email-mode.md) — EmailView components, platform detection pattern, avatar proxy, and remaining backend gaps.
+- [Xanda contact intelligence v1](contact-intelligence.md) — DB schema, intelligence routes, memory card, meeting prep, relationship score, and what's next.

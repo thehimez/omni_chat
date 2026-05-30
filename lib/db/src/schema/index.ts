@@ -6,3 +6,5 @@ export * from "./contacts";
 export * from "./xan_messages";
 export * from "./notification_settings";
 export * from "./whatsapp_contacts";
+export * from "./contact_ai_summary";
+export * from "./contact_facts";

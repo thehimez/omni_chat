@@ -1,0 +1,347 @@
+Use this as your next Replit prompt:
+
+---
+
+**Proceed with implementation.**
+
+The research phase is complete and approved.
+
+We are now building **Xanda Contact Intelligence v1**.
+
+Do not build a CRM.
+
+Do not build a separate product.
+
+Build an intelligence layer that lives directly inside the existing inbox experience.
+
+# PRODUCT VISION
+
+Xanda should become:
+
+> The only inbox that remembers everything about the people you communicate with.
+
+The user should receive AI-powered context before sending a message.
+
+The intelligence must appear naturally inside conversations and contact profiles.
+
+---
+
+# PHASE 1 IMPLEMENTATION
+
+Implement the highest-value features first.
+
+No placeholders.
+
+Use production-quality architecture.
+
+---
+
+## FEATURE 1 — XAN MEMORY CARD
+
+When any conversation is opened:
+
+Display an AI Context Card directly above the message composer.
+
+Example:
+
+🧠 Xan Memory
+
+Last discussed:
+Partnership proposal
+
+Important facts:
+• Founder of Last Mile
+• Based in Bangalore
+
+Open items:
+• Send updated pricing deck
+
+Suggested follow-up:
+Ask whether they reviewed the proposal.
+
+---
+
+Requirements:
+
+* Generate automatically
+* Refresh intelligently
+* Cache results
+* Regenerate when conversation changes significantly
+* Must work across:
+
+  * WhatsApp
+  * Gmail
+  * Outlook
+  * LinkedIn
+  * Instagram
+  * Telegram
+
+Investigate existing AI infrastructure before adding anything new.
+
+Reuse current Xan architecture wherever possible.
+
+---
+
+## FEATURE 2 — CONTACT INTELLIGENCE PROFILE
+
+Create a dedicated Contact Profile.
+
+Access methods:
+
+* Clicking avatar
+* Clicking contact name
+* Contact sidebar button
+
+Profile Layout:
+
+### Header
+
+Avatar
+
+Contact Name
+
+Connected Platforms
+
+Relationship Score
+
+Last Interaction Date
+
+Buttons:
+
+* Message
+* AI Meeting Prep
+* Add Note
+
+---
+
+### Overview Section
+
+AI-generated relationship summary.
+
+Example:
+
+"Himanshu is a startup founder you have communicated with across WhatsApp and LinkedIn. Most recent discussions focused on sponsorship opportunities and partnership planning."
+
+---
+
+### Important Facts
+
+Examples:
+
+* Company
+* Role
+* Location
+* Interests
+* Preferences
+* Important dates
+
+Editable by user.
+
+AI-generated facts must clearly indicate source.
+
+---
+
+### Active Topics
+
+Automatically extracted.
+
+Example:
+
+* Sponsorship
+* Startup
+* Hiring
+* Marketing
+
+---
+
+### Platform Identities
+
+Display all linked accounts.
+
+Example:
+
+WhatsApp
+LinkedIn
+Instagram
+Gmail
+
+Show:
+
+* profile image
+* display name
+* platform badge
+
+---
+
+## FEATURE 3 — UNIFIED TIMELINE
+
+This is a core differentiator.
+
+Build a single timeline that merges communication from every platform.
+
+Example:
+
+May 10 — WhatsApp
+
+May 12 — LinkedIn
+
+May 15 — Gmail
+
+May 18 — Instagram
+
+May 25 — WhatsApp
+
+All shown in one chronological feed.
+
+Each event should display:
+
+* platform icon
+* timestamp
+* sender
+* preview
+
+Expandable for details.
+
+---
+
+## FEATURE 4 — AI MEETING PREP
+
+Add a button:
+
+"Prepare Me"
+
+Generate a concise briefing.
+
+Sections:
+
+### Who is this person?
+
+### Relationship Summary
+
+### Last Discussions
+
+### Important Facts
+
+### Open Commitments
+
+### Suggested Talking Points
+
+### Recommended Next Action
+
+This should feel like a personal executive assistant.
+
+---
+
+## FEATURE 5 — RELATIONSHIP SCORE
+
+Implement an actual relationship score.
+
+Inputs:
+
+* conversation count
+* recency
+* responsiveness
+* interaction frequency
+* cross-platform engagement
+
+Display:
+
+0–100
+
+With labels:
+
+Weak
+
+Growing
+
+Strong
+
+Very Strong
+
+---
+
+# DATABASE DESIGN
+
+Before implementation:
+
+Analyze existing schema.
+
+Reuse:
+
+* contacts
+* contactIdentity
+* conversations
+* messages
+* topicLabel
+* headline
+* relationshipScore
+
+Only create new tables if truly necessary.
+
+Prefer extending existing architecture.
+
+---
+
+# PERFORMANCE REQUIREMENTS
+
+Do not run expensive AI calls on every conversation open.
+
+Implement:
+
+* caching
+* refresh intervals
+* lazy generation
+* background generation
+
+Use existing AI infrastructure.
+
+---
+
+# UI REQUIREMENTS
+
+Design quality should match:
+
+* Linear
+* Superhuman
+* Notion
+* Kinso
+
+Requirements:
+
+* Minimal
+* Premium
+* Fast
+* Clean
+* Modern
+
+Must match existing Xanda design system.
+
+No clutter.
+
+No CRM-style complexity.
+
+---
+
+# IMPORTANT
+
+Do NOT stop after analysis.
+
+Implement incrementally.
+
+After each feature:
+
+1. Build
+2. Test
+3. Verify
+4. Show screenshots
+5. Report findings
+6. Continue to next feature
+
+Begin with:
+
+1. Schema analysis
+2. Existing AI architecture analysis
+3. Contact profile architecture
+4. Xan Memory Card implementation
+
+Then proceed sequentially until Phase 1 is fully working.

@@ -8,6 +8,7 @@ import {
   GetContactResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middleware/auth";
+import { computeRelationshipScore, scoreLabel } from "./intelligence";
 
 const router: IRouter = Router();
 
@@ -34,7 +35,11 @@ router.get("/contacts", requireAuth, async (req: Request, res: Response): Promis
       avatarUrl: c.avatarUrl ?? null,
       platforms: c.platforms ?? [],
       lastSeenAt: c.lastSeenAt?.toISOString() ?? null,
-      relationshipScore: null,
+      relationshipScore: computeRelationshipScore(
+        c.conversationCount,
+        c.lastSeenAt,
+        (c.platforms ?? []).length,
+      ),
       activeConversationCount: c.conversationCount ?? 0,
     })),
     total: contacts.length,
@@ -63,6 +68,21 @@ router.get("/contacts/:id", requireAuth, async (req: Request, res: Response): Pr
     .orderBy(desc(conversationsTable.lastMessageAt))
     .limit(20);
 
+  // Derive active topics from real conversation topic labels
+  const activeTopics = [
+    ...new Set(
+      conversations
+        .map((c) => c.topicLabel)
+        .filter((t): t is string => Boolean(t)),
+    ),
+  ].slice(0, 8);
+
+  const score = computeRelationshipScore(
+    contact[0].conversationCount,
+    contact[0].lastSeenAt,
+    (contact[0].platforms ?? []).length,
+  );
+
   res.json(GetContactResponse.parse({
     id: contact[0].id,
     displayName: contact[0].displayName,
@@ -86,9 +106,9 @@ router.get("/contacts/:id", requireAuth, async (req: Request, res: Response): Pr
       lastMessageAt: c.lastMessageAt.toISOString(),
       unreadCount: c.unreadCount,
     })),
-    relationshipScore: null,
+    relationshipScore: score,
     lastInteractionAt: contact[0].lastSeenAt?.toISOString() ?? null,
-    activeTopics: [],
+    activeTopics,
   }));
 });
 
