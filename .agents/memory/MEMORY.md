@@ -5,3 +5,4 @@
 - [Xanda contact intelligence v1](contact-intelligence.md) — DB schema, intelligence routes, memory card, meeting prep, relationship score, and what's next.
 - [Xanda contact ID generation](contact-id-hash.md) — contact IDs use MD5 (Node crypto + Postgres MD5() both produce same output); backfill uses bulk SQL with MD5.
 - [Xanda AI priority inbox](ai-priority-inbox.md) — scoring logic, new DB columns, batch summarize endpoint, tab architecture, and backfill pattern.
+- [Xanda AI action inbox](ai-action-inbox.md) — action analyzer wiring, json_object needs max_completion_tokens:4096, only fire on needsReply=true to avoid 200+ calls/sync.

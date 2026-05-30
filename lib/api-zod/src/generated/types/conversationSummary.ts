@@ -29,4 +29,11 @@ export interface ConversationSummary {
   /** @nullable */
   aiPriorityScore?: number | null;
   needsReply?: boolean;
+  aiActionRequired?: boolean;
+  /** @nullable */
+  aiActionLabel?: string | null;
+  aiActionScore?: number;
+  aiActionStatus?: string;
+  /** @nullable */
+  aiTopicLabel?: string | null;
 }

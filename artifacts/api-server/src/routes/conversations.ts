@@ -77,6 +77,11 @@ router.get("/conversations", requireAuth, async (req: Request, res: Response): P
       aiSummary: c.aiSummary ?? null,
       aiPriorityScore: c.aiPriorityScore ?? null,
       needsReply: c.needsReply ?? false,
+      aiActionRequired: c.aiActionRequired ?? false,
+      aiActionLabel: c.aiActionLabel ?? null,
+      aiActionScore: c.aiActionScore ?? 0,
+      aiActionStatus: c.aiActionStatus ?? "active",
+      aiTopicLabel: c.aiTopicLabel ?? null,
     })),
     total: total.length,
     hasMore: offset + conversations.length < total.length,
@@ -136,7 +141,7 @@ router.post("/conversations/:id/read", requireAuth, async (req: Request, res: Re
 
   await db
     .update(conversationsTable)
-    .set({ isRead: true, unreadCount: 0 })
+    .set({ isRead: true, unreadCount: 0, aiActionStatus: "seen" })
     .where(and(eq(conversationsTable.id, rawId), eq(conversationsTable.userId, user.id)));
 
   await db

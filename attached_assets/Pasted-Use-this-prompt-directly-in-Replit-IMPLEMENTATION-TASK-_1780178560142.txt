@@ -1,0 +1,578 @@
+Use this prompt directly in Replit:
+
+---
+
+# IMPLEMENTATION TASK — Replace Current Priority System with AI Action Inbox
+
+The current Priority/Briefing page is not useful because it is based mainly on unread messages, recency, and simple scoring.
+
+I want to completely redesign the system into an **AI Action Inbox**.
+
+This should behave like a personal executive assistant that continuously monitors all incoming messages and surfaces only conversations that require action from me.
+
+---
+
+## CORE PHILOSOPHY
+
+The briefing page should NOT answer:
+
+```text
+What is unread?
+```
+
+The briefing page should answer:
+
+```text
+What do I need to do right now?
+```
+
+This is a fundamentally different system.
+
+Unread messages ≠ Important.
+
+Important means:
+
+* Someone is waiting for my response
+* Someone requested something from me
+* Someone asked a question
+* Someone wants a decision
+* Someone wants approval
+* Someone wants information
+* Someone assigned me work
+* Someone invited me to something
+* Someone expects an action
+
+Everything else should be ignored.
+
+---
+
+# PLATFORM SCOPE
+
+Implement for:
+
+✅ Gmail
+
+✅ Outlook
+
+✅ WhatsApp Personal Chats
+
+✅ Telegram Personal Chats
+
+✅ Instagram DMs
+
+✅ LinkedIn DMs
+
+Ignore for now:
+
+❌ WhatsApp Groups
+
+❌ Telegram Groups
+
+❌ LinkedIn Groups
+
+❌ Broadcast Channels
+
+❌ Newsletters
+
+❌ Promotional Threads
+
+---
+
+# NEW AI ACTION ANALYZER AGENT
+
+Create a background agent:
+
+```text
+Action Detection Agent
+```
+
+This agent must run automatically whenever:
+
+* new message arrives
+* conversation updates
+* sync completes
+* webhook received
+
+The agent should analyze ONLY the latest inbound message.
+
+---
+
+# AGENT OUTPUT
+
+Store:
+
+```ts
+conversation.aiActionRequired
+conversation.aiActionLabel
+conversation.aiActionScore
+conversation.aiActionReason
+conversation.aiLastAnalyzedAt
+conversation.aiActionStatus
+```
+
+---
+
+## aiActionRequired
+
+Boolean
+
+```ts
+true
+false
+```
+
+---
+
+## aiActionLabel
+
+One sentence.
+
+Examples:
+
+```text
+Send sponsorship proposal
+
+Confirm event attendance
+
+Review attached document
+
+Provide pricing information
+
+Reply with availability
+
+Approve partnership request
+
+Share project update
+
+Answer technical question
+
+Schedule follow-up call
+```
+
+NOT:
+
+```text
+"Hello"
+"How are you"
+"Good morning"
+```
+
+Must always describe:
+
+```text
+What action I should take
+```
+
+---
+
+## aiActionScore
+
+Range:
+
+```text
+0-100
+```
+
+Priority ranking:
+
+### 90-100
+
+Critical
+
+Examples:
+
+* client waiting
+* deadline today
+* approval needed
+* payment issue
+* urgent business request
+
+### 70-89
+
+High
+
+Examples:
+
+* question requiring answer
+* information requested
+* document requested
+
+### 40-69
+
+Medium
+
+Examples:
+
+* follow-up
+* discussion continuation
+
+### 0-39
+
+Low
+
+Examples:
+
+* FYI
+* casual conversation
+* reactions
+* greetings
+
+---
+
+## aiActionReason
+
+Internal explanation
+
+Example:
+
+```text
+User is being asked to provide sponsorship details.
+```
+
+Not shown in UI.
+
+---
+
+# PRIORITY PAGE REDESIGN
+
+Current page:
+
+```text
+Top Priority
+```
+
+Replace with:
+
+```text
+Action Required
+```
+
+Only show:
+
+```ts
+aiActionRequired === true
+```
+
+Do NOT show:
+
+* unread messages
+* reacted messages
+* greetings
+* newsletters
+* notifications
+
+---
+
+# CARD DESIGN
+
+Each row should contain:
+
+LEFT
+
+* Avatar
+
+CENTER
+
+Contact Name
+
+AI Action Label
+
+Example:
+
+```text
+Himanshu Karmakar
+
+Send sponsorship proposal document
+```
+
+NOT latest message preview.
+
+The latest message preview must disappear completely.
+
+---
+
+RIGHT
+
+Priority Badge
+
+Examples:
+
+```text
+CRITICAL
+HIGH
+MEDIUM
+```
+
+Below it:
+
+```text
+Received 12m ago
+Received 2h ago
+Received yesterday
+```
+
+---
+
+# AUTO DISMISS LOGIC
+
+Very important.
+
+When I open a conversation:
+
+```ts
+markActionResolved()
+```
+
+Immediately:
+
+```ts
+aiActionStatus = "seen"
+```
+
+Remove from briefing page.
+
+Do NOT keep it visible.
+
+Briefing page should only contain:
+
+```text
+unseen action requests
+```
+
+Once I viewed it:
+
+```text
+gone
+```
+
+Exactly like notifications.
+
+---
+
+# BACKGROUND PRIORITY ORGANIZER AGENT
+
+Create another agent:
+
+```text
+Priority Ranking Agent
+```
+
+Runs whenever:
+
+* new message arrives
+* action status changes
+* sync completes
+
+This agent sorts all active action items.
+
+---
+
+# SORTING LOGIC
+
+Highest priority first.
+
+Example ranking:
+
+```text
+Client requested proposal
+Score 95
+
+Investor requested meeting
+Score 92
+
+Business partner waiting reply
+Score 90
+
+Question from lead
+Score 80
+
+Friend asking for help
+Score 60
+```
+
+Not:
+
+```text
+Most recent first
+```
+
+Importance first.
+
+---
+
+# CONVERSATION LABELING SYSTEM
+
+Replace current preview text under every conversation.
+
+Current:
+
+```text
+latest message snippet
+```
+
+Remove.
+
+Replace with:
+
+```text
+AI Conversation Label
+```
+
+Examples:
+
+```text
+Sponsorship discussion
+
+Project collaboration
+
+University application
+
+Event planning
+
+Partnership opportunity
+
+Hiring discussion
+
+Sales inquiry
+
+Customer support
+```
+
+Generate automatically.
+
+Update whenever conversation changes.
+
+Store:
+
+```ts
+conversation.aiTopicLabel
+```
+
+---
+
+# GMAIL / OUTLOOK SPECIAL HANDLING
+
+Promotional emails should never appear.
+
+Examples:
+
+```text
+Sale
+Newsletter
+Marketing
+Promotion
+Offer
+Discount
+```
+
+Automatically:
+
+```ts
+aiActionRequired = false
+```
+
+Examples that SHOULD appear:
+
+```text
+Please review the proposal
+
+Can you send the document?
+
+Need your approval
+
+Confirm attendance
+
+Please provide details
+
+Let's schedule a meeting
+```
+
+---
+
+# DATABASE CHANGES
+
+Add:
+
+```sql
+ALTER TABLE conversations
+ADD COLUMN ai_action_required BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE conversations
+ADD COLUMN ai_action_label TEXT;
+
+ALTER TABLE conversations
+ADD COLUMN ai_action_score INTEGER DEFAULT 0;
+
+ALTER TABLE conversations
+ADD COLUMN ai_action_reason TEXT;
+
+ALTER TABLE conversations
+ADD COLUMN ai_action_status TEXT DEFAULT 'active';
+
+ALTER TABLE conversations
+ADD COLUMN ai_last_analyzed_at TIMESTAMP;
+
+ALTER TABLE conversations
+ADD COLUMN ai_topic_label TEXT;
+```
+
+---
+
+# PERFORMANCE REQUIREMENTS
+
+Do NOT call OpenAI every page load.
+
+Analysis should happen:
+
+```text
+On message arrival
+```
+
+Store results.
+
+UI reads stored values.
+
+Use:
+
+```text
+Webhook
+→ Analyze
+→ Save result
+→ Update ranking
+```
+
+NOT:
+
+```text
+Open page
+→ Analyze everything again
+```
+
+---
+
+# FINAL GOAL
+
+Transform Xanda from:
+
+```text
+Unified Inbox
+```
+
+into:
+
+```text
+AI Action Inbox
+```
+
+The Briefing page should become the first screen a user opens every morning.
+
+The user should immediately know:
+
+* What needs action
+* What needs reply
+* What needs approval
+* What needs attention
+
+without opening Gmail, WhatsApp, LinkedIn, Telegram, Instagram, or Outlook individually.
+
+The system should behave like a continuously running executive assistant that organizes and prioritizes all incoming communication automatically.

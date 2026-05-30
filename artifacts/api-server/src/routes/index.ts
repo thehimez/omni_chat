@@ -17,6 +17,7 @@ import eventsRouter from "./events";
 import avatarProxyRouter from "./avatar-proxy";
 import intelligenceRouter from "./intelligence";
 import aiPriorityRouter from "./ai-priority";
+import aiActionsRouter from "./ai-actions";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use(eventsRouter);
 router.use(avatarProxyRouter);
 router.use(intelligenceRouter);
 router.use(aiPriorityRouter);
+router.use(aiActionsRouter);
 
 export default router;

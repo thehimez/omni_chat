@@ -26,6 +26,13 @@ export const conversationsTable = pgTable("conversations", {
   aiSummary: text("ai_summary"),
   aiPriorityScore: integer("ai_priority_score"),
   needsReply: boolean("needs_reply").notNull().default(false),
+  aiActionRequired: boolean("ai_action_required").notNull().default(false),
+  aiActionLabel: text("ai_action_label"),
+  aiActionScore: integer("ai_action_score").notNull().default(0),
+  aiActionReason: text("ai_action_reason"),
+  aiActionStatus: text("ai_action_status").notNull().default("active"),
+  aiLastAnalyzedAt: timestamp("ai_last_analyzed_at", { withTimezone: true }),
+  aiTopicLabel: text("ai_topic_label"),
   lastMessageAt: timestamp("last_message_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -98,7 +98,12 @@ export const GetConversationsResponse = zod.object({
   "unreadCount": zod.number(),
   "aiSummary": zod.string().nullish(),
   "aiPriorityScore": zod.number().nullish(),
-  "needsReply": zod.boolean().optional()
+  "needsReply": zod.boolean().optional(),
+  "aiActionRequired": zod.boolean().optional(),
+  "aiActionLabel": zod.string().nullish(),
+  "aiActionScore": zod.number().optional(),
+  "aiActionStatus": zod.string().optional(),
+  "aiTopicLabel": zod.string().nullish()
 })),
   "total": zod.number(),
   "hasMore": zod.boolean()

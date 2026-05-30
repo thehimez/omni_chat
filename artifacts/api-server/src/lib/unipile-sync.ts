@@ -4,6 +4,7 @@ import { logger } from "./logger";
 import { broadcastToUser } from "./sse-broadcaster";
 import { upsertContactForConversation } from "./contact-linker";
 import { scoreConversation } from "./priority-scorer";
+import { analyzeConversation } from "./action-analyzer";
 
 const EMAIL_PLATFORMS = new Set(["gmail", "outlook"]);
 const CHAT_PLATFORMS = new Set(["whatsapp", "linkedin", "instagram", "telegram", "messenger", "twitter"]);
@@ -381,6 +382,28 @@ async function syncEmails(
       latest.date ? new Date(latest.date) : new Date(),
     ).catch(() => {}); // non-blocking — never fail the sync
 
+    // Action Detection Agent — only fires when there are unread inbound messages
+    if (gmailScored.needsReply) {
+      analyzeConversation({
+        contactName,
+        platform: "gmail",
+        headline,
+        topicLabel: subject,
+        needsReply: true,
+        providerChatId: null,
+        unreadCount: gmailUnread,
+      }).then(async (result) => {
+        await db.update(conversationsTable).set({
+          aiActionRequired: result.actionRequired,
+          aiActionLabel: result.actionLabel,
+          aiActionScore: result.actionScore,
+          aiActionReason: result.actionReason,
+          aiTopicLabel: result.topicLabel,
+          aiLastAnalyzedAt: new Date(),
+        }).where(eq(conversationsTable.id, convId));
+      }).catch(() => {});
+    }
+
     // Stream this conversation to the UI immediately instead of waiting for
     // the whole sync to finish.
     broadcastToUser(userId, "conversation_updated", {
@@ -595,6 +618,28 @@ async function syncChats(
       convId,
       new Date(lastAt),
     ).catch(() => {}); // non-blocking — never fail the sync
+
+    // Action Detection Agent — only fires when there are unread inbound messages
+    if (chatScored.needsReply) {
+      analyzeConversation({
+        contactName,
+        platform,
+        headline,
+        topicLabel: null,
+        needsReply: true,
+        providerChatId,
+        unreadCount: chat.unread_count ?? 0,
+      }).then(async (result) => {
+        await db.update(conversationsTable).set({
+          aiActionRequired: result.actionRequired,
+          aiActionLabel: result.actionLabel,
+          aiActionScore: result.actionScore,
+          aiActionReason: result.actionReason,
+          aiTopicLabel: result.topicLabel,
+          aiLastAnalyzedAt: new Date(),
+        }).where(eq(conversationsTable.id, convId));
+      }).catch(() => {});
+    }
 
     // Stream this conversation to the UI immediately so it appears one-by-one
     // during a Sync All instead of all-at-once when the job finishes.
@@ -838,6 +883,28 @@ export async function syncChatById(
           set: { bodyText },
         });
     }
+
+    // Action Detection Agent — always fires on webhook (a new message just arrived)
+    analyzeConversation({
+      contactName,
+      platform,
+      headline,
+      topicLabel: null,
+      needsReply: webhookScored.needsReply,
+      providerChatId,
+      unreadCount: chat.unread_count ?? 0,
+    }).then(async (result) => {
+      await db.update(conversationsTable).set({
+        aiActionRequired: result.actionRequired,
+        aiActionLabel: result.actionLabel,
+        aiActionScore: result.actionScore,
+        aiActionReason: result.actionReason,
+        aiTopicLabel: result.topicLabel,
+        aiLastAnalyzedAt: new Date(),
+        // Reset to "active" on webhook so new action items re-appear even if previously dismissed
+        ...(result.actionRequired ? { aiActionStatus: "active" } : {}),
+      }).where(eq(conversationsTable.id, convId));
+    }).catch(() => {});
 
     logger.info({ convId, externalChatId, platform }, "Incremental single-chat sync complete");
     return convId;

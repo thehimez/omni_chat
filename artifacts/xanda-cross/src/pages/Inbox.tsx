@@ -88,7 +88,9 @@ export default function Inbox() {
         return {
           ...old,
           conversations: old.conversations.map((c: any) =>
-            c.id === convId ? { ...c, isRead: true, unreadCount: 0 } : c,
+            c.id === convId
+              ? { ...c, isRead: true, unreadCount: 0, aiActionStatus: "seen" }
+              : c,
           ),
         };
       });
@@ -116,9 +118,9 @@ export default function Inbox() {
 
   const viewedConversations = useMemo(() => {
     if (activeView === "priority") {
-      return [...filtered].sort(
-        (a, b) => (b.aiPriorityScore ?? 50) - (a.aiPriorityScore ?? 50),
-      );
+      return [...filtered]
+        .filter((c) => (c as any).aiActionRequired && (c as any).aiActionStatus !== "seen")
+        .sort((a, b) => ((b as any).aiActionScore ?? 0) - ((a as any).aiActionScore ?? 0));
     }
     if (activeView === "followups") {
       return filtered.filter(
@@ -131,12 +133,14 @@ export default function Inbox() {
   useEffect(() => {
     if (activeView === "priority" && !hasPrioritized) {
       setHasPrioritized(true);
-      fetch(`${API_BASE}/api/ai/prioritize`, {
+      fetch(`${API_BASE}/api/ai/analyze`, {
         method: "POST",
         credentials: "include",
       })
         .then(() => {
-          queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
+          }, 3000);
         })
         .catch(() => {});
     }
@@ -220,7 +224,7 @@ export default function Inbox() {
                       ? activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)
                       : "All",
                   },
-                  { key: "priority" as const, label: "Priority", emoji: "✦" },
+                  { key: "priority" as const, label: "Actions", emoji: "⚡" },
                   { key: "followups" as const, label: "Follow-ups", emoji: "↩" },
                 ]
               ).map((tab) => (
@@ -271,7 +275,7 @@ export default function Inbox() {
                       : activeView === "followups"
                         ? "No follow-ups needed"
                         : activeView === "priority"
-                          ? "No priority messages"
+                          ? "No action items"
                           : "Your inbox is empty"}
                   </p>
                   {connectedAccounts.length > 0 && !searchQuery ? (
@@ -304,14 +308,72 @@ export default function Inbox() {
               <div className="py-2">
                 <AnimatePresence>
                   {viewedConversations.map((conv, i) => {
-                    const isHigh = (conv.aiPriorityScore ?? 50) >= 70;
                     const hasUnread = !conv.isRead && conv.unreadCount > 0;
-                    const summaryText =
+                    const actionScore = (conv as any).aiActionScore ?? 0;
+                    const actionLabel = (conv as any).aiActionLabel;
+                    const topicLabel = (conv as any).aiTopicLabel;
+                    const subtitleText =
+                      topicLabel ||
                       conv.aiSummary ||
                       conv.topicLabel ||
                       conv.headline ||
                       conv.preview ||
                       "—";
+
+                    const badgeClass =
+                      actionScore >= 90
+                        ? "bg-rose-600 text-white"
+                        : actionScore >= 70
+                          ? "bg-orange-500 text-white"
+                          : "bg-amber-400 text-white";
+                    const badgeLabel =
+                      actionScore >= 90
+                        ? "CRITICAL"
+                        : actionScore >= 70
+                          ? "HIGH"
+                          : "MEDIUM";
+
+                    if (activeView === "priority") {
+                      // ── Actions tab card ──────────────────────────────────
+                      return (
+                        <motion.button
+                          key={conv.id}
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          transition={{ delay: i * 0.03, duration: 0.2 }}
+                          onClick={() => handleSelectConversation(conv.id)}
+                          className={`w-full text-left px-4 py-3.5 transition-all duration-150 border-l-2
+                            ${selectedId === conv.id ? "bg-blue-50/80 border-blue-400" : "hover:bg-gray-50/80 border-transparent"}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="relative shrink-0">
+                              <Avatar name={conv.contactName} src={conv.contactAvatarUrl} />
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-semibold text-gray-900 truncate block">
+                                {conv.contactName}
+                              </span>
+                              <p className="text-xs text-gray-500 truncate leading-snug mt-0.5">
+                                {actionLabel || subtitleText}
+                              </p>
+                            </div>
+
+                            <div className="shrink-0 flex flex-col items-end gap-1.5 ml-1">
+                              <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${badgeClass}`}>
+                                {badgeLabel}
+                              </span>
+                              <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                {formatInboxTimestamp(conv.lastMessageAt)}
+                              </span>
+                            </div>
+                          </div>
+                        </motion.button>
+                      );
+                    }
+
+                    // ── All / Follow-ups tab card ─────────────────────────
                     return (
                       <motion.button
                         key={conv.id}
@@ -319,18 +381,14 @@ export default function Inbox() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.03, duration: 0.2 }}
                         onClick={() => handleSelectConversation(conv.id)}
-                        className={`w-full text-left px-4 transition-all duration-150 group
-                          ${activeView === "priority" ? "py-4" : "py-3.5"}
-                          ${selectedId === conv.id ? "bg-blue-50/80" : "hover:bg-gray-50/80"}
-                          ${activeView === "priority" && isHigh && selectedId !== conv.id ? "border-l-2 border-rose-400" : "border-l-2 border-transparent"}`}
+                        className={`w-full text-left px-4 py-3.5 transition-all duration-150 group border-l-2 border-transparent
+                          ${selectedId === conv.id ? "bg-blue-50/80" : "hover:bg-gray-50/80"}`}
                       >
                         <div className="flex items-start gap-3">
                           <div className="relative shrink-0">
                             <Avatar name={conv.contactName} src={conv.contactAvatarUrl} />
-                            {isHigh && hasUnread ? (
-                              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-rose-500 rounded-full border-2 border-white" />
-                            ) : hasUnread ? (
-                              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-blue-500 rounded-full border-2 border-white" />
+                            {hasUnread ? (
+                              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-white" />
                             ) : null}
                           </div>
 
@@ -346,7 +404,7 @@ export default function Inbox() {
                               </span>
                             </div>
                             <p className="text-xs text-gray-500 truncate leading-snug">
-                              {summaryText}
+                              {subtitleText}
                             </p>
                           </div>
 
