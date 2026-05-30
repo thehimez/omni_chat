@@ -69,7 +69,7 @@ function SidebarDock() {
     <>
       <aside className="w-[72px] h-screen flex flex-col items-center py-4 gap-2 bg-white/70 backdrop-blur-xl border-r border-white/60 shadow-[1px_0_20px_rgba(0,0,0,0.04)] shrink-0 z-10">
         {/* Logo */}
-        <Link href="/inbox">
+        <Link href="/briefing">
           <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.97 }}

@@ -144,7 +144,7 @@ function HomeRedirect() {
   return (
     <>
       <Show when="signed-in">
-        <Redirect to="/inbox" />
+        <Redirect to="/briefing" />
       </Show>
       <Show when="signed-out">
         <Landing />
@@ -189,8 +189,8 @@ function ClerkInner() {
       proxyUrl={clerkProxyUrl}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
-      signInFallbackRedirectUrl="/inbox"
-      signUpFallbackRedirectUrl="/inbox"
+      signInFallbackRedirectUrl="/briefing"
+      signUpFallbackRedirectUrl="/briefing"
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to))}
       appearance={clerkAppearance}
