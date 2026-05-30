@@ -200,13 +200,15 @@ function resolveChatName(
   const other = attendees.find((a) => !a.is_self);
 
   if (platform === "whatsapp") {
-    // WhatsApp resolution priority:
-    // 1. Address-book contacts lookup (synced from /api/v1/users if available)
-    // 2. chat.name — Unipile mirrors WhatsApp's own conversation title, which is
-    //    the saved contact name for saved numbers, and the phone number for
-    //    unsaved numbers, matching WhatsApp Web behaviour exactly.
-    // 3. Normalised phone number from attendee data as last resort.
-    // NOTE: attendee.name (push_name) is intentionally never used.
+    // WhatsApp resolution priority — must match WhatsApp Web behaviour exactly:
+    // 1. Address-book contacts lookup (synced from /api/v1/users when available)
+    // 2. attendee.name — Unipile returns the SAVED CONTACT NAME from the phone's
+    //    address book in GET /api/v1/chats/{id}/attendees. For unsaved contacts
+    //    the non-self attendee is absent from the list, so this naturally falls
+    //    through. This is NOT push_name — push_name lives in message.original.pushName.
+    // 3. chat.name — usually null for WhatsApp DMs in this Unipile version; kept
+    //    as a tertiary catch-all and for edge cases.
+    // 4. Normalised E.164 phone number as last resort.
     const rawPhone =
       other?.specifics?.phone_number ??
       other?.public_identifier ??
@@ -214,15 +216,16 @@ function resolveChatName(
       null;
     const phone = normalizePhone(rawPhone);
 
-    // Priority 1: saved address-book contact
+    // Priority 1: saved address-book contact (lookup populated when /users API works)
     if (phone && contactsLookup?.has(phone)) return contactsLookup.get(phone)!.savedName;
 
-    // Priority 2: WhatsApp-level conversation title from Unipile (skipping groups
-    // — they're handled at the top of the function)
-    if (!isGroup && chatName?.trim()) return chatName.trim();
-    if (isGroup && chatName?.trim()) return chatName.trim();
+    // Priority 2: attendee.name — saved contact name from the phone's address book
+    if (other?.name?.trim()) return other.name.trim();
 
-    // Priority 3: normalised phone number
+    // Priority 3: chat.name (groups handled above; here catches any DM edge cases)
+    if (chatName?.trim()) return chatName.trim();
+
+    // Priority 4: normalised phone number (unsaved contacts)
     return phone ?? "Unknown";
   }
 
@@ -777,50 +780,80 @@ export async function syncChatById(
 // ─── Re-resolve WhatsApp conversation names from address book ─────────────────
 
 /**
- * After the address book is synced, update ALL existing WhatsApp DM conversations
- * for this user so that:
- *  - Numbers saved in contacts → display the saved contact name
- *  - Numbers NOT in contacts   → display the E.164 phone number
- * Groups (JIDs ending in @g.us) are skipped; they keep their group name.
+ * After chats are synced, re-resolve ALL existing WhatsApp DM conversations for
+ * this user using the same priority as resolveChatName:
+ *  1. contacts lookup (address-book, if populated)
+ *  2. attendee.name fetched live from Unipile (saved contact name)
+ *  3. normalised E.164 phone number (unsaved contacts)
+ * Groups (JIDs ending in @g.us) are skipped.
  * Returns { matched, updated, total } counts for reporting.
  */
 export async function reResolveWhatsappConversations(
   userId: string,
   accountId: string,
   contactsLookup: ContactsLookup,
+  host: string,
+  apiKey: string,
 ): Promise<{ matched: number; updated: number; total: number }> {
   const conversations = await db
-    .select({ id: conversationsTable.id, providerChatId: conversationsTable.providerChatId, contactName: conversationsTable.contactName })
+    .select({
+      id: conversationsTable.id,
+      externalId: conversationsTable.externalId,
+      providerChatId: conversationsTable.providerChatId,
+      contactName: conversationsTable.contactName,
+    })
     .from(conversationsTable)
     .where(and(eq(conversationsTable.userId, userId), eq(conversationsTable.platform, "whatsapp")));
 
   let matched = 0;
   let updated = 0;
 
-  for (const conv of conversations) {
-    if (!conv.providerChatId) continue;
-    if (conv.providerChatId.includes("@g.us")) continue; // groups keep their name
+  // Process in small batches to avoid hammering the Unipile API
+  const BATCH = 5;
+  for (let i = 0; i < conversations.length; i += BATCH) {
+    const batch = conversations.slice(i, i + BATCH);
+    await Promise.all(batch.map(async (conv) => {
+      if (!conv.providerChatId) return;
+      if (conv.providerChatId.includes("@g.us")) return; // groups keep their name
 
-    const phone = normalizePhone(conv.providerChatId);
-    if (!phone) continue;
+      const phone = normalizePhone(conv.providerChatId);
+      if (!phone) return;
 
-    const contact = contactsLookup.get(phone);
-    if (contact) {
-      // Confirmed saved contact — use the address-book name
-      const newName = contact.savedName;
+      let newName: string;
+
+      // Priority 1: contacts lookup
+      if (contactsLookup.has(phone)) {
+        newName = contactsLookup.get(phone)!.savedName;
+        matched++;
+      } else if (conv.externalId) {
+        // Priority 2: fetch attendees live — attendee.name is the saved contact name
+        const attendees = await fetchChatAttendees(conv.externalId, host, apiKey);
+        const other = attendees.find((a) => !a.is_self);
+        if (other?.name?.trim()) {
+          newName = other.name.trim();
+          matched++;
+        } else {
+          // Priority 3: unsaved contact — normalised phone
+          newName = phone;
+        }
+      } else {
+        // No externalId stored — fall back to phone
+        newName = phone;
+      }
+
       if (newName !== conv.contactName) {
-        await db.update(conversationsTable).set({ contactName: newName }).where(eq(conversationsTable.id, conv.id));
+        await db
+          .update(conversationsTable)
+          .set({ contactName: newName })
+          .where(eq(conversationsTable.id, conv.id));
         updated++;
       }
-      matched++;
-    }
-    // Unsaved contacts: leave whatever the most recent syncChats set
-    // (chat.name from Unipile, which mirrors WhatsApp Web's phone-number display)
+    }));
   }
 
   logger.info(
     { userId, accountId, total: conversations.length, matched, updated },
-    "WhatsApp conversations re-resolved from address book",
+    "WhatsApp conversations re-resolved",
   );
   return { matched, updated, total: conversations.length };
 }
@@ -868,7 +901,7 @@ export async function syncAccount(
       // any stale push-names or raw phone numbers with saved contact names.
       if (platform === "whatsapp") {
         const lookup = await buildContactsLookup(accountDbId);
-        await reResolveWhatsappConversations(userId, accountDbId, lookup);
+        await reResolveWhatsappConversations(userId, accountDbId, lookup, host, apiKey);
       }
     }
 
