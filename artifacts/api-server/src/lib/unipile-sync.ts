@@ -3,6 +3,7 @@ import { db, connectedAccountsTable, conversationsTable, messagesTable, whatsapp
 import { logger } from "./logger";
 import { broadcastToUser } from "./sse-broadcaster";
 import { upsertContactForConversation } from "./contact-linker";
+import { scoreConversation } from "./priority-scorer";
 
 const EMAIL_PLATFORMS = new Set(["gmail", "outlook"]);
 const CHAT_PLATFORMS = new Set(["whatsapp", "linkedin", "instagram", "telegram", "messenger", "twitter"]);
@@ -326,6 +327,17 @@ async function syncEmails(
     const rawBody = latest.body_plain ?? (latest.body ? stripHtml(latest.body) : null);
     const headline = truncate(rawBody);
     const convId = `conv_${accountId}_${threadId.slice(-16)}`;
+    const gmailUnread = threadEmails.filter((e) => e.unread).length;
+    const gmailLastAt = latest.date ? new Date(latest.date) : new Date();
+    const gmailScored = scoreConversation({
+      unreadCount: gmailUnread,
+      isRead: !(latest.unread ?? false),
+      lastMessageAt: gmailLastAt,
+      headline,
+      topicLabel: subject,
+      contactName,
+      platform: "gmail",
+    });
 
     await db
       .insert(conversationsTable)
@@ -337,10 +349,12 @@ async function syncEmails(
         contactName,
         topicLabel: subject,
         headline,
-        priority: "medium",
+        priority: gmailScored.priority,
+        aiPriorityScore: gmailScored.score,
+        needsReply: gmailScored.needsReply,
         isRead: !(latest.unread ?? false),
-        unreadCount: threadEmails.filter((e) => e.unread).length,
-        lastMessageAt: latest.date ? new Date(latest.date) : new Date(),
+        unreadCount: gmailUnread,
+        lastMessageAt: gmailLastAt,
       })
       .onConflictDoUpdate({
         target: conversationsTable.id,
@@ -348,9 +362,12 @@ async function syncEmails(
           contactName,
           topicLabel: subject,
           headline,
+          priority: gmailScored.priority,
+          aiPriorityScore: gmailScored.score,
+          needsReply: gmailScored.needsReply,
           isRead: !(latest.unread ?? false),
-          unreadCount: threadEmails.filter((e) => e.unread).length,
-          lastMessageAt: latest.date ? new Date(latest.date) : new Date(),
+          unreadCount: gmailUnread,
+          lastMessageAt: gmailLastAt,
         },
       });
 
@@ -524,6 +541,17 @@ async function syncChats(
     // We check all known field names so webhook lookups can match by provider JID.
     const providerChatId = chatProviderJid(chat);
 
+    const chatScored = scoreConversation({
+      unreadCount: chat.unread_count ?? 0,
+      isRead: (chat.unread_count ?? 0) === 0,
+      lastMessageAt: new Date(lastAt),
+      headline,
+      topicLabel: null,
+      contactName,
+      platform,
+      providerChatId,
+    });
+
     await db
       .insert(conversationsTable)
       .values({
@@ -535,7 +563,9 @@ async function syncChats(
         contactName,
         headline,
         contactAvatarUrl: avatarUrl,
-        priority: "medium",
+        priority: chatScored.priority,
+        aiPriorityScore: chatScored.score,
+        needsReply: chatScored.needsReply,
         isRead: (chat.unread_count ?? 0) === 0,
         unreadCount: chat.unread_count ?? 0,
         lastMessageAt: new Date(lastAt),
@@ -547,6 +577,9 @@ async function syncChats(
           contactName,
           headline,
           contactAvatarUrl: avatarUrl,
+          priority: chatScored.priority,
+          aiPriorityScore: chatScored.score,
+          needsReply: chatScored.needsReply,
           unreadCount: chat.unread_count ?? 0,
           isRead: (chat.unread_count ?? 0) === 0,
           lastMessageAt: new Date(lastAt),
@@ -735,6 +768,17 @@ export async function syncChatById(
     // was passed to us (which might already be the native JID from the webhook)
     const providerChatId = chatProviderJid(chat) ?? externalChatId;
 
+    const webhookScored = scoreConversation({
+      unreadCount: chat.unread_count ?? 0,
+      isRead: (chat.unread_count ?? 0) === 0,
+      lastMessageAt: new Date(lastAt),
+      headline,
+      topicLabel: null,
+      contactName,
+      platform,
+      providerChatId,
+    });
+
     await db
       .insert(conversationsTable)
       .values({
@@ -746,7 +790,9 @@ export async function syncChatById(
         contactName,
         headline,
         contactAvatarUrl: avatarUrl,
-        priority: "medium",
+        priority: webhookScored.priority,
+        aiPriorityScore: webhookScored.score,
+        needsReply: webhookScored.needsReply,
         isRead: (chat.unread_count ?? 0) === 0,
         unreadCount: chat.unread_count ?? 0,
         lastMessageAt: new Date(lastAt),
@@ -758,6 +804,9 @@ export async function syncChatById(
           contactName,
           headline,
           contactAvatarUrl: avatarUrl,
+          priority: webhookScored.priority,
+          aiPriorityScore: webhookScored.score,
+          needsReply: webhookScored.needsReply,
           unreadCount: chat.unread_count ?? 0,
           isRead: (chat.unread_count ?? 0) === 0,
           lastMessageAt: new Date(lastAt),

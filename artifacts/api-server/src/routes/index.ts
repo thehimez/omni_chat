@@ -16,6 +16,7 @@ import unipoleDiagnosticRouter from "./unipile-diagnostic";
 import eventsRouter from "./events";
 import avatarProxyRouter from "./avatar-proxy";
 import intelligenceRouter from "./intelligence";
+import aiPriorityRouter from "./ai-priority";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(unipoleDiagnosticRouter);
 router.use(eventsRouter);
 router.use(avatarProxyRouter);
 router.use(intelligenceRouter);
+router.use(aiPriorityRouter);
 
 export default router;

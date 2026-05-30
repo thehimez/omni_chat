@@ -4,3 +4,4 @@
 - [Xanda email mode architecture](xanda-email-mode.md) — EmailView components, platform detection pattern, avatar proxy, and remaining backend gaps.
 - [Xanda contact intelligence v1](contact-intelligence.md) — DB schema, intelligence routes, memory card, meeting prep, relationship score, and what's next.
 - [Xanda contact ID generation](contact-id-hash.md) — contact IDs use MD5 (Node crypto + Postgres MD5() both produce same output); backfill uses bulk SQL with MD5.
+- [Xanda AI priority inbox](ai-priority-inbox.md) — scoring logic, new DB columns, batch summarize endpoint, tab architecture, and backfill pattern.

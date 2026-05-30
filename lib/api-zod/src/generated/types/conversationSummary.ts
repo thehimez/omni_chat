@@ -24,4 +24,9 @@ export interface ConversationSummary {
   isRead: boolean;
   lastMessageAt: string;
   unreadCount: number;
+  /** @nullable */
+  aiSummary?: string | null;
+  /** @nullable */
+  aiPriorityScore?: number | null;
+  needsReply?: boolean;
 }

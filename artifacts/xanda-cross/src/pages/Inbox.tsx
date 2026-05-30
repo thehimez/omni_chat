@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useLocation, useSearch } from "wouter";
 import {
   useGetConversations,
@@ -76,7 +76,10 @@ export default function Inbox() {
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeView, setActiveView] = useState<"all" | "priority" | "followups">("all");
+  const [hasPrioritized, setHasPrioritized] = useState(false);
   const { activePlatform } = usePlatformFilter();
+  const API_BASE = (import.meta as any).env?.VITE_API_URL ?? "";
 
   const handleSelectConversation = useCallback(
     (convId: string) => {
@@ -110,6 +113,34 @@ export default function Inbox() {
       (c.topicLabel ?? "").toLowerCase().includes(searchQuery.toLowerCase());
     return matchesPlatform && matchesSearch;
   });
+
+  const viewedConversations = useMemo(() => {
+    if (activeView === "priority") {
+      return [...filtered].sort(
+        (a, b) => (b.aiPriorityScore ?? 50) - (a.aiPriorityScore ?? 50),
+      );
+    }
+    if (activeView === "followups") {
+      return filtered.filter(
+        (c) => c.needsReply || (!c.isRead && c.unreadCount > 0),
+      );
+    }
+    return filtered;
+  }, [filtered, activeView]);
+
+  useEffect(() => {
+    if (activeView === "priority" && !hasPrioritized) {
+      setHasPrioritized(true);
+      fetch(`${API_BASE}/api/ai/prioritize`, {
+        method: "POST",
+        credentials: "include",
+      })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
+        })
+        .catch(() => {});
+    }
+  }, [activeView, hasPrioritized, API_BASE, queryClient]);
 
   const handleSyncAll = async () => {
     if (connectedAccounts.length === 0) return;
@@ -179,18 +210,40 @@ export default function Inbox() {
           transition={{ duration: 0.3, delay: 0.05 }}
           className="w-[340px] shrink-0 flex flex-col bg-white/75 backdrop-blur-xl rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.07)] border border-white/70 overflow-hidden"
         >
-          <div className="px-5 py-4 border-b border-gray-100/80 flex items-center justify-between shrink-0">
-            <h2 className="font-semibold text-gray-900 text-[15px]">
-              {activePlatform ? (
-                <span className="flex items-center gap-2">
-                  <PlatformIcon platform={activePlatform} className="w-4 h-4" />
-                  <span className="capitalize">{activePlatform}</span>
-                </span>
-              ) : (
-                "Inbox"
-              )}
-            </h2>
-            <span className="text-xs text-gray-400 font-medium">{filtered.length}</span>
+          <div className="px-4 pt-3.5 pb-0 shrink-0">
+            <div className="flex items-center gap-0.5 pb-3 border-b border-gray-100/80">
+              {(
+                [
+                  {
+                    key: "all" as const,
+                    label: activePlatform
+                      ? activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)
+                      : "All",
+                  },
+                  { key: "priority" as const, label: "Priority", emoji: "✦" },
+                  { key: "followups" as const, label: "Follow-ups", emoji: "↩" },
+                ]
+              ).map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveView(tab.key)}
+                  className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-all
+                    ${
+                      activeView === tab.key
+                        ? "bg-gray-900 text-white shadow-sm"
+                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-100/70"
+                    }`}
+                >
+                  {"emoji" in tab && (
+                    <span className="text-[10px] opacity-80">{tab.emoji}</span>
+                  )}
+                  {tab.label}
+                </button>
+              ))}
+              <span className="ml-auto text-[11px] text-gray-400 font-medium pr-0.5">
+                {viewedConversations.length}
+              </span>
+            </div>
           </div>
 
           <ScrollArea className="flex-1">
@@ -206,14 +259,20 @@ export default function Inbox() {
                   </div>
                 ))}
               </div>
-            ) : filtered.length === 0 ? (
+            ) : viewedConversations.length === 0 ? (
               <div className="p-8 flex flex-col items-center justify-center text-center gap-4 min-h-[280px]">
                 <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center">
                   <InboxIcon className="w-6 h-6 text-gray-300" />
                 </div>
                 <div>
                   <p className="font-medium text-sm text-gray-600 mb-1">
-                    {searchQuery ? "No matching messages" : "Your inbox is empty"}
+                    {searchQuery
+                      ? "No matching messages"
+                      : activeView === "followups"
+                        ? "No follow-ups needed"
+                        : activeView === "priority"
+                          ? "No priority messages"
+                          : "Your inbox is empty"}
                   </p>
                   {connectedAccounts.length > 0 && !searchQuery ? (
                     <>
@@ -244,47 +303,60 @@ export default function Inbox() {
             ) : (
               <div className="py-2">
                 <AnimatePresence>
-                  {filtered.map((conv, i) => (
-                    <motion.button
-                      key={conv.id}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.03, duration: 0.2 }}
-                      onClick={() => handleSelectConversation(conv.id)}
-                      className={`w-full text-left px-4 py-3.5 flex items-center gap-3 transition-all duration-150 group
-                        ${selectedId === conv.id
-                          ? "bg-blue-50/80"
-                          : "hover:bg-gray-50/80"
-                        }`}
-                    >
-                      <div className="relative shrink-0">
-                        <Avatar name={conv.contactName} src={conv.contactAvatarUrl} />
-                        {!conv.isRead && conv.unreadCount > 0 && (
-                          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-blue-500 rounded-full border-2 border-white" />
-                        )}
-                      </div>
+                  {viewedConversations.map((conv, i) => {
+                    const isHigh = (conv.aiPriorityScore ?? 50) >= 70;
+                    const hasUnread = !conv.isRead && conv.unreadCount > 0;
+                    const summaryText =
+                      conv.aiSummary ||
+                      conv.topicLabel ||
+                      conv.headline ||
+                      conv.preview ||
+                      "—";
+                    return (
+                      <motion.button
+                        key={conv.id}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.03, duration: 0.2 }}
+                        onClick={() => handleSelectConversation(conv.id)}
+                        className={`w-full text-left px-4 transition-all duration-150 group
+                          ${activeView === "priority" ? "py-4" : "py-3.5"}
+                          ${selectedId === conv.id ? "bg-blue-50/80" : "hover:bg-gray-50/80"}
+                          ${activeView === "priority" && isHigh && selectedId !== conv.id ? "border-l-2 border-rose-400" : "border-l-2 border-transparent"}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="relative shrink-0">
+                            <Avatar name={conv.contactName} src={conv.contactAvatarUrl} />
+                            {isHigh && hasUnread ? (
+                              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-rose-500 rounded-full border-2 border-white" />
+                            ) : hasUnread ? (
+                              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-blue-500 rounded-full border-2 border-white" />
+                            ) : null}
+                          </div>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span
-                            className={`text-sm truncate ${!conv.isRead && conv.unreadCount > 0 ? "font-bold text-gray-900" : "font-semibold text-gray-800"}`}
-                          >
-                            {conv.contactName}
-                          </span>
-                          <span className="text-[11px] text-gray-400 whitespace-nowrap shrink-0">
-                            {formatInboxTimestamp(conv.lastMessageAt)}
-                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <span
+                                className={`text-sm truncate ${hasUnread ? "font-bold text-gray-900" : "font-semibold text-gray-800"}`}
+                              >
+                                {conv.contactName}
+                              </span>
+                              <span className="text-[11px] text-gray-400 whitespace-nowrap shrink-0">
+                                {formatInboxTimestamp(conv.lastMessageAt)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 truncate leading-snug">
+                              {summaryText}
+                            </p>
+                          </div>
+
+                          <div className="shrink-0 opacity-80 mt-0.5">
+                            <PlatformIcon platform={conv.platform} className="w-4 h-4" />
+                          </div>
                         </div>
-                        <p className="text-xs text-gray-500 truncate leading-snug">
-                          {conv.topicLabel || conv.headline || conv.preview || "—"}
-                        </p>
-                      </div>
-
-                      <div className="shrink-0 opacity-80">
-                        <PlatformIcon platform={conv.platform} className="w-4 h-4" />
-                      </div>
-                    </motion.button>
-                  ))}
+                      </motion.button>
+                    );
+                  })}
                 </AnimatePresence>
               </div>
             )}

@@ -1,0 +1,241 @@
+Use this prompt in Replit:
+
+---
+
+**IMPLEMENTATION TASK — REPLACE CURRENT UNIFIED INBOX WITH AI PRIORITY INBOX (KINSO-STYLE)**
+
+The investigation phase is complete.
+
+Proceed with implementation planning and then implementation.
+
+I am attaching a Kinso AI inbox screenshot for design and UX inspiration.
+
+### OBJECTIVE
+
+Transform the current "Unified Inbox" into an **AI Prioritized Inbox**.
+
+The inbox should no longer be a simple chronological list of conversations.
+
+Instead, every conversation should be analyzed and ranked by importance, urgency, and required action.
+
+The result should feel similar to Kinso AI, but adapted for Xanda Cross.
+
+---
+
+# PHASE 1 — INVESTIGATION (NO UI CHANGES YET)
+
+First audit the existing system and provide a report.
+
+Determine:
+
+### Current conversation model
+
+What data is available per conversation?
+
+Examples:
+
+* last message
+* unread count
+* platform
+* last activity
+* contact name
+* profile photo
+* participant count
+* conversation type
+* sender
+* attachments
+* reactions
+* AI draft availability
+
+### Current AI infrastructure
+
+Check:
+
+* XAN AI integration
+* summarization endpoints
+* message embedding storage
+* conversation memory
+* OpenAI calls
+* background jobs
+
+Determine what can already be reused.
+
+---
+
+# PHASE 2 — DESIGN THE AI PRIORITY ENGINE
+
+Design a scoring system.
+
+Each conversation should receive an AI Priority Score.
+
+Example:
+
+Priority Score =
+
+* unread messages
+* direct questions
+* messages waiting for reply
+* mentions
+* important contacts
+* recent activity
+* deadlines
+* requests
+* tasks
+* follow-ups
+
+Minus:
+
+* newsletters
+* promotional emails
+* low-value notifications
+* automated alerts
+* resolved conversations
+
+Provide exact scoring logic.
+
+---
+
+# PHASE 3 — AI SUMMARIZATION LAYER
+
+For each conversation generate:
+
+### One-line summary
+
+Examples:
+
+"Wants pricing details for sponsorship package."
+
+"Waiting for contract approval."
+
+"Requested project update."
+
+"Sent design feedback."
+
+### Contact memory summary
+
+Generate:
+
+* who this person is
+* relationship
+* past topics
+* key facts
+
+Store separately from messages.
+
+---
+
+# PHASE 4 — NEW INBOX UI
+
+Create a completely new inbox mode called:
+
+### AI Priority
+
+The inbox card should contain:
+
+* avatar
+* contact name
+* AI-generated summary
+* platform icon
+* priority indicator
+* timestamp
+
+Example:
+
+Natasha Corwin
+
+"Wants you to share a sales contract with key details included."
+
+[Gmail]
+
+High Priority
+
+3m ago
+
+Do NOT show raw message previews by default.
+
+Show AI summaries instead.
+
+---
+
+# PHASE 5 — MULTIPLE VIEWS
+
+Create 3 inbox tabs:
+
+### Messages
+
+Current behavior.
+
+Chronological.
+
+### AI Priority
+
+AI-ranked conversations.
+
+### Follow Ups
+
+Only conversations where:
+
+* reply pending
+* question unanswered
+* action required
+* task assigned
+
+---
+
+# PHASE 6 — CONTACT INTELLIGENCE PANEL
+
+When opening a conversation add a new tab:
+
+### Contact Intelligence
+
+Show:
+
+* AI summary of relationship
+* conversation history summary
+* important facts
+* recent topics
+* follow-up suggestions
+* last interaction date
+
+Inspired by Kinso's contact memory feature.
+
+---
+
+# PHASE 7 — PERFORMANCE DESIGN
+
+The AI layer must not run on every page load.
+
+Design:
+
+* background processing
+* cached summaries
+* cached priority scores
+* incremental updates
+
+Explain storage strategy.
+
+Explain database changes.
+
+Explain cost implications.
+
+---
+
+# PHASE 8 — IMPLEMENTATION ROADMAP
+
+Before writing code provide:
+
+1. Architecture diagram
+2. Database changes
+3. API changes
+4. Background job design
+5. AI prompt design
+6. Estimated implementation phases
+7. Risks and edge cases
+
+Only after presenting the implementation plan and receiving approval should coding begin.
+
+---
+
+**Design Goal:**
+
+Xanda should evolve from a traditional omnichannel inbox into an **AI Relationship OS**, where users see what matters most first, not simply the newest message. Use Kinso AI as inspiration, but improve upon it for a multi-platform environment (WhatsApp, Gmail, Outlook, Instagram, LinkedIn, Telegram, Teams, Slack, etc.).

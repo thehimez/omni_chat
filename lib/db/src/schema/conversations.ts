@@ -23,6 +23,9 @@ export const conversationsTable = pgTable("conversations", {
   isRead: boolean("is_read").notNull().default(false),
   unreadCount: integer("unread_count").notNull().default(0),
   draftReply: text("draft_reply"),
+  aiSummary: text("ai_summary"),
+  aiPriorityScore: integer("ai_priority_score"),
+  needsReply: boolean("needs_reply").notNull().default(false),
   lastMessageAt: timestamp("last_message_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
