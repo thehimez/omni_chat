@@ -26,13 +26,19 @@ async function callOpenAI(systemPrompt: string, userMessage: string): Promise<st
     const openai = getOpenAIClient();
     const resp = await openai.chat.completions.create({
       model: "gpt-5-mini",
-      max_completion_tokens: 800,
+      max_completion_tokens: 4096,
+      response_format: { type: "json_object" },
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
     });
-    return resp.choices[0]?.message?.content ?? "";
+    const content = resp.choices[0]?.message?.content;
+    if (!content || content.trim() === "") {
+      logger.warn({ finish_reason: resp.choices[0]?.finish_reason }, "OpenAI returned empty content");
+      throw new Error(`Empty response from model (finish_reason: ${resp.choices[0]?.finish_reason})`);
+    }
+    return content;
   } catch (err) {
     logger.error({ err }, "OpenAI error in intelligence route");
     throw err;
@@ -239,37 +245,40 @@ Rules:
   const prompt = `Contact: ${contact[0].displayName}\nPlatforms: ${(contact[0].platforms ?? []).join(", ")}\nKnown facts: ${factsContext || "none"}\n\nRecent messages:\n${messageContext || "(no messages yet)"}`;
 
   let card: Record<string, unknown>;
+  let aiSuccess = false;
   try {
     const raw = await callOpenAI(systemPrompt, prompt);
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    card = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+    card = JSON.parse(raw);
+    aiSuccess = true;
   } catch (err) {
     logger.error({ err }, "Failed to generate or parse memory card");
     card = {
-      lastDiscussed: "Unable to generate context",
+      lastDiscussed: "No context yet — try opening a conversation first.",
       importantFacts: [],
       openItems: [],
       suggestedFollowUp: "",
     };
   }
 
-  // Upsert cache
-  const summaryId = `ais_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000); // 3h
-  if (cached[0]) {
-    await db.update(contactAiSummaryTable)
-      .set({ content: JSON.stringify(card), generatedAt: new Date(), expiresAt })
-      .where(eq(contactAiSummaryTable.id, cached[0].id));
-  } else {
-    await db.insert(contactAiSummaryTable).values({
-      id: summaryId,
-      userId: user.id,
-      contactId,
-      conversationId: conversationId ?? "",
-      summaryType: "memory_card",
-      content: JSON.stringify(card),
-      expiresAt,
-    });
+  // Only cache successful AI responses — failures should retry next time
+  if (aiSuccess) {
+    const summaryId = `ais_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000); // 3h
+    if (cached[0]) {
+      await db.update(contactAiSummaryTable)
+        .set({ content: JSON.stringify(card), generatedAt: new Date(), expiresAt })
+        .where(eq(contactAiSummaryTable.id, cached[0].id));
+    } else {
+      await db.insert(contactAiSummaryTable).values({
+        id: summaryId,
+        userId: user.id,
+        contactId,
+        conversationId: conversationId ?? "",
+        summaryType: "memory_card",
+        content: JSON.stringify(card),
+        expiresAt,
+      });
+    }
   }
 
   res.json({ card, cached: false });
@@ -332,15 +341,16 @@ router.post("/contacts/:id/intelligence/meeting-prep", requireAuth, async (req: 
   const prompt = `Contact: ${contact[0].displayName}\nPlatforms: ${(contact[0].platforms ?? []).join(", ")}\nConversation count: ${contact[0].conversationCount}\nKnown topics: ${topicsFromConvs.join(", ") || "none"}\nKnown facts:\n${factsContext || "none"}\n\nRecent message history:\n${messageContext || "(no messages)"}`;
 
   let brief: Record<string, unknown>;
+  let aiSuccess = false;
   try {
     const raw = await callOpenAI(systemPrompt, prompt);
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    brief = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+    brief = JSON.parse(raw);
+    aiSuccess = true;
   } catch (err) {
     logger.error({ err }, "Failed to generate meeting prep");
     brief = {
       whoIsThisPerson: contact[0].displayName,
-      relationshipSummary: "Insufficient data to generate summary.",
+      relationshipSummary: "Not enough conversation history yet to generate a briefing.",
       lastDiscussions: topicsFromConvs,
       importantFacts: [],
       openCommitments: [],
@@ -349,17 +359,20 @@ router.post("/contacts/:id/intelligence/meeting-prep", requireAuth, async (req: 
     };
   }
 
-  const summaryId = `ais_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
-  if (cached[0]) {
-    await db.update(contactAiSummaryTable)
-      .set({ content: JSON.stringify(brief), generatedAt: new Date(), expiresAt })
-      .where(eq(contactAiSummaryTable.id, cached[0].id));
-  } else {
-    await db.insert(contactAiSummaryTable).values({
-      id: summaryId, userId: user.id, contactId, conversationId: null,
-      summaryType: "meeting_prep", content: JSON.stringify(brief), expiresAt,
-    });
+  // Only cache successful AI responses
+  if (aiSuccess) {
+    const summaryId = `ais_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    if (cached[0]) {
+      await db.update(contactAiSummaryTable)
+        .set({ content: JSON.stringify(brief), generatedAt: new Date(), expiresAt })
+        .where(eq(contactAiSummaryTable.id, cached[0].id));
+    } else {
+      await db.insert(contactAiSummaryTable).values({
+        id: summaryId, userId: user.id, contactId, conversationId: null,
+        summaryType: "meeting_prep", content: JSON.stringify(brief), expiresAt,
+      });
+    }
   }
 
   res.json({ brief, cached: false });
