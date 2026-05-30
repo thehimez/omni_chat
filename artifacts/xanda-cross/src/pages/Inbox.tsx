@@ -14,6 +14,7 @@ import {
 } from "@workspace/api-client-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PlatformIcon } from "@/components/platform-icon";
+import { EmailView } from "@/components/email/EmailView";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bot,
@@ -295,9 +296,13 @@ export default function Inbox() {
           transition={{ duration: 0.3, delay: 0.08 }}
           className="flex-1 min-w-0 bg-white/75 backdrop-blur-xl rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.07)] border border-white/70 overflow-hidden flex flex-col"
         >
-          {selectedId ? (
-            <ConversationView id={selectedId} />
-          ) : (
+          {selectedId ? (() => {
+            const selConv = conversations.find((c) => c.id === selectedId);
+            const isEmail = selConv?.platform === "gmail" || selConv?.platform === "outlook";
+            return isEmail
+              ? <EmailView id={selectedId} connectedAccounts={connectedAccounts} />
+              : <ConversationView id={selectedId} />;
+          })() : (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 p-8">
               <div className="w-16 h-16 rounded-3xl bg-gray-50 flex items-center justify-center">
                 <MessageSquare className="w-8 h-8 text-gray-300" />

@@ -1,0 +1,236 @@
+Proceed with implementation.
+
+I want Xanda to have a premium, AI-first Email Experience for Gmail and Outlook.
+
+Do not build a Gmail clone.
+
+Do not build an Outlook clone.
+
+Design and implement a Xanda-native email experience that feels modern, professional, and integrated with the unified inbox.
+
+GOAL
+
+Keep one unified inbox for all platforms.
+
+WhatsApp, Instagram, LinkedIn, Telegram continue using the current chat interface.
+
+Gmail and Outlook should automatically switch to an Email Mode UI when opened.
+
+EMAIL MODE REQUIREMENTS
+
+1. Conversation Header
+
+Display:
+
+* Subject (large and prominent)
+* Sender name
+* Sender email
+* Recipient email(s)
+* Date and time
+* Platform badge (Gmail / Outlook)
+
+Clean, premium layout.
+
+2. Thread View
+
+Replace chat bubbles for email conversations.
+
+Render email threads as stacked email cards.
+
+Each email card should show:
+
+* Sender
+* Timestamp
+* Message content
+* Expand / Collapse
+
+Quoted replies should be collapsed by default.
+
+Add:
+
+"Show previous messages"
+
+similar to modern email clients.
+
+3. HTML Email Rendering
+
+Use stored bodyHtml when available.
+
+Render formatted emails correctly.
+
+Support:
+
+* Links
+* Bold
+* Tables
+* Images
+* Lists
+* Marketing emails
+
+Fallback to bodyText if HTML is unavailable.
+
+4. Attachments Section
+
+Create attachment support UI.
+
+For each email:
+
+* File name
+* Size
+* Download button
+* Preview button (if supported)
+
+If attachment backend is not ready:
+
+Create the UI architecture now so backend integration is simple later.
+
+5. AI Workspace
+
+Add a dedicated AI section above the reply area:
+
+Actions:
+
+* Summarize Thread
+* Suggested Reply
+* Rewrite Professional
+* Rewrite Friendly
+* Extract Action Items
+* Detect Meeting Requests
+
+This should become a major differentiator of Xanda.
+
+6. Smart Reply Composer
+
+Replace the current chat-style composer.
+
+Composer should include:
+
+To:
+CC:
+BCC:
+Subject:
+
+Message editor
+
+Attachments
+
+Buttons:
+
+* Send
+* Reply
+* Reply All
+* Forward
+* AI Draft
+
+Keep advanced fields collapsed until needed.
+
+7. Quick Reply Mode
+
+For users who want speed:
+
+Add a compact quick-reply field.
+
+Example:
+
+"Quick Reply..."
+
+with one-click AI suggestions.
+
+User can switch between:
+
+* Quick Reply
+* Full Email Composer
+
+8. New Email Compose Modal
+
+Implement a dedicated compose modal.
+
+Fields:
+
+To
+CC
+BCC
+Subject
+Message
+
+Attachments area
+
+AI drafting tools
+
+This should work for both Gmail and Outlook.
+
+9. Visual Design
+
+Design direction:
+
+* Premium SaaS
+* Linear
+* Notion
+* Superhuman
+* Arc Browser
+
+Characteristics:
+
+* Clean spacing
+* Minimal borders
+* Elegant typography
+* Modern cards
+* Excellent readability
+
+Avoid:
+
+* Gmail-style clutter
+* Outlook-style enterprise complexity
+
+10. Mobile Responsive Design
+
+Design the email experience for:
+
+* Desktop
+* Tablet
+* Mobile
+
+The UI should remain excellent on all devices.
+
+11. Preserve Unified Inbox
+
+Do NOT create a separate email application.
+
+Emails must remain inside the Xanda inbox.
+
+The user should move seamlessly between:
+
+WhatsApp
+Instagram
+LinkedIn
+Telegram
+Gmail
+Outlook
+
+without leaving the unified experience.
+
+IMPLEMENTATION APPROACH
+
+Phase 1:
+Implement the new Email UI architecture and components.
+
+Phase 2:
+Wire existing reply functionality into the new UI.
+
+Phase 3:
+Add support for Reply All, CC, BCC, Forward, Attachments, and Rich Text where supported by backend APIs.
+
+Phase 4:
+Add advanced AI features.
+
+After implementation, provide:
+
+* Screenshots
+* Before vs After comparison
+* Components created
+* Remaining backend limitations
+* Recommended next improvements
+
+Do not ask for approval between steps.
+
+Implement the best possible Xanda Email Experience.
