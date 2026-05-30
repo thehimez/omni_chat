@@ -1,0 +1,136 @@
+Pure investigation only. DO NOT implement anything. DO NOT modify code. DO NOT create new endpoints. DO NOT change UI.
+
+I want a feasibility and source-data investigation regarding profile avatars/photos across platforms.
+
+Current observation:
+
+1. Instagram
+- Profile photos are appearing correctly in Xanda.
+- This proves avatar rendering already works somewhere.
+
+2. WhatsApp
+- Xanda currently shows only letter avatars.
+- Real WhatsApp shows either:
+  - contact profile photo
+  - or WhatsApp's default blank avatar when no photo exists.
+
+3. LinkedIn
+- Xanda currently shows only letter avatars.
+- Real LinkedIn messaging shows profile photos for many contacts.
+- When no photo exists, LinkedIn shows its default placeholder avatar.
+
+4. Gmail
+- Xanda currently shows mostly first-letter avatars.
+- Gmail web/mobile behaves differently:
+  - Some senders have brand logos.
+  - Some senders have profile photos.
+  - Some show first-letter avatars.
+  - Some show provider-generated icons.
+
+I want a complete investigation.
+
+Questions to answer:
+
+A. WHATSAPP
+
+For WhatsApp conversations:
+
+1. Does Unipile expose profile photo URLs?
+
+2. Which endpoint provides them?
+
+3. Is the photo available:
+   - on chat object?
+   - attendee object?
+   - contact object?
+   - another endpoint?
+
+4. For the following cases separately:
+
+- saved contact with photo
+- saved contact without photo
+- unsaved number with photo
+- unsaved number without photo
+- group chat
+- business account
+
+Show actual fields returned by the API.
+
+5. If photo is unavailable:
+   what fallback data exists?
+
+B. LINKEDIN
+
+For LinkedIn conversations:
+
+1. Does Unipile expose member profile photos?
+
+2. Which endpoint contains them?
+
+3. Are they available:
+   - in chat list
+   - conversation details
+   - participant/member object
+
+4. Are the URLs stable and usable in the frontend?
+
+5. If no photo exists, what placeholder data is returned?
+
+Show actual payload fields.
+
+C. GMAIL
+
+For Gmail conversations:
+
+Investigate how Gmail sender avatars could be obtained.
+
+Specifically determine:
+
+1. Does Unipile return sender avatar URLs?
+
+2. For personal Gmail accounts
+
+3. For Google Workspace accounts
+
+4. For company emails
+
+5. For brand senders such as:
+   LinkedIn
+   Instagram
+   Reddit
+   Shopify
+   etc.
+
+6. Are sender logos/profile images available through:
+   - Gmail API
+   - Google People API
+   - Unipile
+   - BIMI
+   - Google sender branding
+
+7. Why does Gmail mobile show logos for some senders but not others?
+
+D. INSTAGRAM
+
+Since Instagram already displays avatars correctly:
+
+1. Show exactly where Xanda currently gets Instagram avatar URLs from.
+
+2. Show which field is being used.
+
+3. Determine whether the same avatar-rendering mechanism could theoretically work for WhatsApp and LinkedIn.
+
+OUTPUT REQUIRED
+
+For each platform provide:
+
+- Avatar available? (YES/NO/PARTIAL)
+- Exact API endpoint
+- Exact field name
+- Example payload
+- Reliability percentage
+- Recommended fallback hierarchy
+
+Do not implement anything.
+
+Only investigate and provide a technical feasibility report.
