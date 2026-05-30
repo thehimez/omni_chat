@@ -1,11 +1,11 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq, or } from "drizzle-orm";
-import { db, usersTable, connectedAccountsTable, conversationsTable, messagesTable } from "@workspace/db";
+import { eq, or, and } from "drizzle-orm";
+import { db, usersTable, connectedAccountsTable, conversationsTable, messagesTable, whatsappContactsTable } from "@workspace/db";
 import { StripeWebhookResponse, UnipileWebhookResponse } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
 import { appendWebhookEvent } from "../lib/webhook-log";
 import { broadcastToUser } from "../lib/sse-broadcaster";
-import { syncChatById } from "../lib/unipile-sync";
+import { syncChatById, normalizePhone } from "../lib/unipile-sync";
 
 const router: IRouter = Router();
 
@@ -255,10 +255,14 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
       const isSender: boolean = payload.is_sender === true;
       const direction: "inbound" | "outbound" = isSender ? "outbound" : "inbound";
 
-      const senderName: string = isSender
+      // For WhatsApp, we resolve the sender from the saved address-book contacts,
+      // not push_name. Compute a preliminary name now; override below once platform
+      // is confirmed.
+      const rawSenderJid: string = payload.sender?.attendee_public_identifier ?? "";
+      let senderName: string = isSender
         ? "Me"
         : (payload.sender?.attendee_name ??
-           payload.sender?.attendee_public_identifier ??
+           rawSenderJid ??
            payload.data?.sender?.name ??
            payload.data?.sender?.display_name ??
            payload.data?.from?.name ??
@@ -269,6 +273,27 @@ router.post("/webhooks/unipile", async (req: Request, res: Response): Promise<vo
         payload.sender?.attendee_specifics?.provider ??
         provider;
       const platform = normalisePlatform(rawProvider);
+
+      // WhatsApp: resolve sender from saved address-book contacts (never push_name)
+      if (!isSender && platform === "whatsapp" && accountId) {
+        const senderPhone = normalizePhone(rawSenderJid);
+        if (senderPhone) {
+          const [acc] = await db
+            .select({ id: connectedAccountsTable.id })
+            .from(connectedAccountsTable)
+            .where(eq(connectedAccountsTable.unipileAccountId, accountId))
+            .limit(1);
+          if (acc) {
+            const [saved] = await db
+              .select({ savedName: whatsappContactsTable.savedName })
+              .from(whatsappContactsTable)
+              .where(and(eq(whatsappContactsTable.accountId, acc.id), eq(whatsappContactsTable.phoneNumber, senderPhone)))
+              .limit(1);
+            senderName = saved?.savedName ?? senderPhone;
+            logger.debug({ senderPhone, resolved: senderName }, "WhatsApp webhook sender resolved from contacts");
+          }
+        }
+      }
 
       if (!chatId) {
         logger.warn({ event, payload: JSON.stringify(payload).slice(0, 200) }, "Unipile webhook missing chat ID");

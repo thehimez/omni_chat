@@ -1,0 +1,185 @@
+Implement the WhatsApp contact resolution fix exactly like WhatsApp Web.
+
+BACKGROUND
+
+Current behavior is wrong.
+
+For some conversations:
+
+- Unsaved numbers show WhatsApp profile names (push_name)
+- Saved contacts sometimes show raw phone numbers
+- XANDA behavior does not match WhatsApp Web
+
+INVESTIGATION FINDINGS
+
+We discovered that:
+
+1. The system currently uses attendee.name from Unipile.
+
+2. For WhatsApp, attendee.name is usually push_name/profile_name/business_name.
+
+3. WhatsApp Web does NOT use push_name as the primary display name.
+
+4. The system never fetches the user's WhatsApp address book from Unipile.
+
+5. The endpoint GET /api/v1/users is not being used.
+
+6. Therefore XANDA has no knowledge of which phone numbers are actually saved in the user's contacts.
+
+GOAL
+
+Make XANDA behave exactly like WhatsApp Web.
+
+EXPECTED BEHAVIOR
+
+RULE 1
+
+If a number exists in the user's WhatsApp contacts:
+
+Show the saved contact name.
+
+Examples:
+
+Rahul Sharma
+Himanshu Karmakar
+Rocket Singh
+
+Do NOT show the phone number.
+
+RULE 2
+
+If a number is NOT saved:
+
+Show only the phone number.
+
+Examples:
+
++91 80509 42349
++91 98633 40173
+
+Do NOT show:
+
+- push_name
+- profile_name
+- business_name
+- WhatsApp display name
+
+RULE 3
+
+The same behavior must work:
+
+- Conversation list
+- Chat header
+- Search results
+- New incoming messages
+- Webhook-created conversations
+- Synced conversations
+
+IMPLEMENTATION TASKS
+
+1. Create a whatsapp_contacts table.
+
+Suggested columns:
+
+id
+account_id
+phone_number
+saved_name
+avatar_url
+synced_at
+created_at
+updated_at
+
+2. During WhatsApp sync:
+
+Call:
+
+GET /api/v1/users?account_id={accountId}
+
+Fetch all contacts.
+
+Store them in whatsapp_contacts.
+
+3. Normalize phone numbers before storage.
+
+Handle:
+
+919876543210
++91 98765 43210
+919876543210@s.whatsapp.net
+
+Convert everything into one normalized E.164 format.
+
+4. Update WhatsApp name resolution.
+
+Current:
+
+attendee.name
+
+New:
+
+phone_number
+    →
+lookup whatsapp_contacts
+    →
+saved_name if found
+    →
+phone number if not found
+
+5. Remove push_name as the primary display source.
+
+Never use:
+
+attendee.name
+attendee.push_name
+business_name
+
+for WhatsApp contact display.
+
+6. Update webhook handling.
+
+When new messages arrive:
+
+Extract sender phone number.
+
+Lookup whatsapp_contacts.
+
+Use:
+
+saved_name
+
+or
+
+phone_number
+
+Do not use attendee_name.
+
+7. Add logging.
+
+Log:
+
+- contacts synced
+- contacts matched
+- contacts not found
+- lookup failures
+
+8. Re-resolve existing WhatsApp conversations.
+
+After contacts are synced:
+
+Update existing conversation names automatically so old phone numbers and push_names are replaced with proper saved contact names.
+
+AFTER IMPLEMENTATION
+
+Provide a report showing:
+
+- Number of contacts fetched
+- Number of conversations matched
+- Number of conversations still unresolved
+- Any limitations from Unipile APIs
+
+Do not redesign UI.
+
+Do not change inbox layout.
+
+Only fix contact identity resolution so XANDA behaves exactly like WhatsApp Web.
