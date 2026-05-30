@@ -1,0 +1,91 @@
+Before continuing implementation, perform a full audit of the newly created AI Priority Inbox.
+
+I want to understand whether the current implementation is merely a scoring/ranking system or whether it has become a true relationship intelligence system.
+
+Investigate and report:
+
+1. What data is currently used to generate AI summaries?
+
+   * latest message only?
+   * last 10 messages?
+   * full conversation history?
+   * all connected platforms?
+
+2. Can the system identify:
+
+   * people waiting for my reply
+   * recurring contacts
+   * clients
+   * partners
+   * friends
+   * team members
+   * leads
+   * investors
+
+3. Can the system generate persistent contact memory?
+
+Example:
+
+Himanshu
+
+* IIT Madras student
+* Interested in space technology
+* Discussed sponsorship proposal
+* Last discussed event collaboration
+
+or
+
+Pratyush
+
+* Co-founder
+* Frequently involved in operations discussions
+* Often reviews partnership documents
+
+4. Can the system merge relationship context across platforms?
+
+Example:
+
+WhatsApp + Gmail + LinkedIn + Instagram
+
+all merged into one relationship profile.
+
+5. Design a Contact Intelligence architecture.
+
+I want Xanda to evolve from:
+
+Message Intelligence
+
+to
+
+Relationship Intelligence.
+
+Provide a detailed implementation plan for:
+
+A. Contact Memory Engine
+B. Relationship Graph
+C. Cross-platform Identity Resolution
+D. AI Contact Profiles
+E. AI-generated People Summaries
+F. Relationship Priority Scoring
+G. Follow-up Recommendations
+H. Meeting Preparation Briefs
+
+Example output:
+
+Before a meeting with a contact, Xanda should show:
+
+* Who they are
+* What we discussed
+* Important facts
+* Open requests
+* Pending follow-ups
+* Relationship history
+* Communication frequency
+
+Use Kinso as inspiration but design a system that works across WhatsApp, Gmail, Outlook, LinkedIn, Instagram, Telegram, Slack and Teams.
+
+Do not write code yet.
+
+First provide architecture, database design, AI pipeline design, storage strategy, update strategy, cost estimates and implementation phases.
+
+After the report, recommend the best version that can realistically be shipped in Xanda within the next 2–4 weeks.
