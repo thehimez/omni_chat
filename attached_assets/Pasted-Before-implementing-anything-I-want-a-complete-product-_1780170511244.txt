@@ -1,0 +1,106 @@
+Before implementing anything, I want a complete product and technical assessment of Gmail and Outlook inside Xanda.
+
+Do NOT write code.
+
+Do NOT make UI changes.
+
+Do NOT implement anything.
+
+I only want a detailed plan and options analysis.
+
+Please investigate and report:
+
+1. Current State
+
+* What email features already work?
+* Can users send new emails?
+* Can users reply to emails?
+* Can users reply-all?
+* Can users forward emails?
+* Can users add attachments?
+* Can users edit subject lines?
+* What Gmail features are currently supported?
+* What Outlook features are currently supported?
+
+2. Gap Analysis
+   Compare Xanda's current email experience against:
+
+* Gmail Web
+* Outlook Web
+
+List every missing feature.
+
+3. UI Architecture Options
+
+Option A:
+Keep the current chat-style interface for email.
+
+Option B:
+Create a dedicated email interface for Gmail and Outlook only.
+
+Option C:
+Hybrid approach:
+
+* Chat-style quick replies
+* Full email mode when needed
+
+For each option explain:
+
+* Pros
+* Cons
+* Complexity
+* Development effort
+* User experience impact
+
+4. Email Threading Investigation
+
+* How are Gmail threads currently stored?
+* How are Outlook threads currently stored?
+* Can we reconstruct full email threads?
+* Can we display conversations like Gmail?
+* What limitations exist from Unipile or current APIs?
+
+5. Sending & Reply Capabilities
+   Investigate whether the backend already supports:
+
+* New email
+* Reply
+* Reply-all
+* Forward
+* Drafts
+* Attachments
+* CC
+* BCC
+* Rich text / HTML emails
+
+For each capability:
+
+* Supported now
+* Partially supported
+* Not supported
+
+6. Recommended Design
+
+Based on Xanda's vision as a unified communication platform, recommend:
+
+* The best email experience
+* The best UI architecture
+* The fastest implementation path
+* The long-term scalable solution
+
+7. Implementation Roadmap
+
+If we decide to improve email support, provide:
+
+Phase 1 (quick wins)
+Phase 2 (core email experience)
+Phase 3 (advanced email features)
+
+Include estimated complexity for each phase.
+
+Important:
+Do not change any code.
+Do not create components.
+Do not implement anything.
+
+I only want a complete investigation report and recommendation.
