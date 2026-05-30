@@ -1,0 +1,206 @@
+I DO NOT WANT YOU TO BUILD ANYTHING YET.
+
+I ONLY WANT THE ARCHITECTURE PLAN.
+
+My product is XANDA, an AI-powered omnichannel communication platform.
+
+The biggest problem I am trying to solve is creating a Unified Person Profile across multiple communication platforms.
+
+Platforms include:
+
+- WhatsApp
+- Gmail
+- Outlook
+- LinkedIn
+- Telegram
+- Instagram
+
+====================================================
+GOAL
+====================================================
+
+I do NOT want users organized by platform.
+
+I want users organized by PEOPLE.
+
+Example:
+
+Ravi may exist as:
+
+- WhatsApp (+91xxxxxxxxxx)
+- Gmail (ravi@gmail.com)
+- Outlook (ravi@company.com)
+- LinkedIn (linkedin.com/in/ravi)
+
+I want all of these to be connected to ONE Unified Person Profile.
+
+The user should see:
+
+Ravi
+
+instead of
+
+WhatsApp Ravi
+Gmail Ravi
+LinkedIn Ravi
+
+====================================================
+I NEED A PLAN ONLY
+====================================================
+
+Please do NOT write code.
+
+Please do NOT build UI.
+
+Please do NOT modify anything.
+
+Only explain:
+
+1. How you would architect this system.
+
+2. How Unified Profiles should work.
+
+3. How new contacts should be created.
+
+4. How existing conversations should be merged.
+
+5. How identity resolution should work.
+
+6. How Gmail threads should connect to a person.
+
+7. How LinkedIn profiles should connect to a person.
+
+8. How WhatsApp numbers should connect to a person.
+
+9. What database structure you recommend.
+
+10. What tables/models you recommend.
+
+11. How unread counts should work across platforms.
+
+12. How message synchronization should work.
+
+13. How platform-specific UIs should work while still keeping a unified profile.
+
+====================================================
+NEW CONTACT CREATION FLOW
+====================================================
+
+I need your recommendation for:
+
+Scenario A:
+
+A user clicks "+ New".
+
+Should they:
+
+A) Create a person first?
+
+OR
+
+B) Select a platform first?
+
+Explain the pros and cons.
+
+====================================================
+EXISTING CONTACT MERGING FLOW
+====================================================
+
+Example:
+
+I already have:
+
+WhatsApp:
++91xxxxxxxxxx
+
+Gmail:
+ravi@gmail.com
+
+LinkedIn:
+Ravi Sharma
+
+How should the system determine these belong to the same person?
+
+Should it:
+
+- Auto merge?
+- Suggest merge?
+- Manual merge?
+
+Explain the safest and most scalable approach.
+
+====================================================
+UNIFIED PROFILE SCREEN
+====================================================
+
+My current idea:
+
+One profile contains:
+
+- Name
+- Profile photo
+- Company
+- Platform icons
+
+Below that:
+
+WhatsApp (3 unread)
+Gmail (2 unread)
+LinkedIn (1 unread)
+
+Clicking a platform icon changes the conversation area into that platform's native UI.
+
+Example:
+
+Click WhatsApp:
+show WhatsApp-style chat
+
+Click Gmail:
+show Gmail-style email thread
+
+Click LinkedIn:
+show LinkedIn-style messaging UI
+
+Please evaluate whether this is the correct approach.
+
+If not, propose a better architecture.
+
+====================================================
+SEARCH
+====================================================
+
+I want ONE global search bar.
+
+The search should find:
+
+- People
+- Emails
+- Messages
+- Phone numbers
+- Companies
+- LinkedIn profiles
+
+Explain how you would design the search architecture.
+
+====================================================
+OUTPUT FORMAT
+====================================================
+
+Provide:
+
+1. Recommended architecture
+2. Data model
+3. Contact merging strategy
+4. Unified profile strategy
+5. Conversation strategy
+6. Search strategy
+7. Risks and edge cases
+8. Final recommendation
+
+Again:
+
+DO NOT BUILD ANYTHING.
+
+DO NOT WRITE CODE.
+
+ONLY GIVE THE IMPLEMENTATION PLAN.
