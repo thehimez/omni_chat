@@ -11,6 +11,7 @@ import {
 import { requireAuth } from "../middleware/auth";
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
+import { backfillContactsForUser } from "../lib/contact-linker";
 
 const router: IRouter = Router();
 
@@ -381,6 +382,16 @@ router.get("/contacts/:id/score", requireAuth, async (req: Request, res: Respons
   );
 
   res.json({ score, label: scoreLabel(score) });
+});
+
+// ── POST /contacts/backfill ───────────────────────────────────────────────────
+
+router.post("/contacts/backfill", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const user = (req as any).user;
+  logger.info({ userId: user.id }, "Starting contact backfill");
+  const result = await backfillContactsForUser(user.id);
+  logger.info({ userId: user.id, ...result }, "Contact backfill complete");
+  res.json({ ok: true, ...result });
 });
 
 export { computeRelationshipScore, scoreLabel };

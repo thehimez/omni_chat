@@ -2,6 +2,7 @@ import { eq, and } from "drizzle-orm";
 import { db, connectedAccountsTable, conversationsTable, messagesTable, whatsappContactsTable } from "@workspace/db";
 import { logger } from "./logger";
 import { broadcastToUser } from "./sse-broadcaster";
+import { upsertContactForConversation } from "./contact-linker";
 
 const EMAIL_PLATFORMS = new Set(["gmail", "outlook"]);
 const CHAT_PLATFORMS = new Set(["whatsapp", "linkedin", "instagram", "telegram", "messenger", "twitter"]);
@@ -353,6 +354,16 @@ async function syncEmails(
         },
       });
 
+    // Link conversation to a contact record
+    await upsertContactForConversation(
+      userId,
+      contactName,
+      "gmail",
+      null,
+      convId,
+      latest.date ? new Date(latest.date) : new Date(),
+    ).catch(() => {}); // non-blocking — never fail the sync
+
     // Stream this conversation to the UI immediately instead of waiting for
     // the whole sync to finish.
     broadcastToUser(userId, "conversation_updated", {
@@ -541,6 +552,16 @@ async function syncChats(
           lastMessageAt: new Date(lastAt),
         },
       });
+
+    // Link conversation to a contact record
+    await upsertContactForConversation(
+      userId,
+      contactName,
+      platform,
+      avatarUrl,
+      convId,
+      new Date(lastAt),
+    ).catch(() => {}); // non-blocking — never fail the sync
 
     // Stream this conversation to the UI immediately so it appears one-by-one
     // during a Sync All instead of all-at-once when the job finishes.
