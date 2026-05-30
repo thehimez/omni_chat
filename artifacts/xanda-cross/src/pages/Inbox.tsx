@@ -34,16 +34,34 @@ import { format } from "date-fns";
 import { formatInboxTimestamp } from "@/lib/format-time";
 import { usePlatformFilter } from "@/lib/platform-filter-context";
 
-function Avatar({ name, src }: { name: string; src?: string | null }) {
+function Avatar({ name, src, platform }: { name: string; src?: string | null; platform?: string }) {
+  const isLinkedIn = platform === "linkedin";
+  console.log(`[Avatar] name="${name}" platform="${platform ?? "?"}" src=${src ? `"${src.slice(0, 80)}…"` : "NULL/UNDEFINED"}`);
+
   if (src) {
     return (
-      <img
-        src={src}
-        alt={name}
-        className="w-11 h-11 rounded-full object-cover shrink-0 shadow-sm"
-      />
+      <div className="relative inline-block">
+        <img
+          src={src}
+          alt={name}
+          className="w-11 h-11 rounded-full object-cover shrink-0 shadow-sm ring-2 ring-red-500"
+          onLoad={(e) => {
+            const img = e.currentTarget;
+            console.log(`[Avatar] ✅ onLoad fired — name="${name}" naturalWidth=${img.naturalWidth} naturalHeight=${img.naturalHeight}`);
+          }}
+          onError={(e) => {
+            console.log(`[Avatar] ❌ onError fired — name="${name}" src="${(e.currentTarget as HTMLImageElement).src.slice(0, 100)}"`);
+          }}
+        />
+        {isLinkedIn && (
+          <span className="absolute -bottom-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1 rounded leading-tight z-10">
+            IMG
+          </span>
+        )}
+      </div>
     );
   }
+
   const colors = [
     "bg-violet-100 text-violet-600",
     "bg-blue-100 text-blue-600",
@@ -53,10 +71,17 @@ function Avatar({ name, src }: { name: string; src?: string | null }) {
   ];
   const idx = name.charCodeAt(0) % colors.length;
   return (
-    <div
-      className={`w-11 h-11 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 ${colors[idx]}`}
-    >
-      {name.charAt(0).toUpperCase()}
+    <div className="relative inline-block">
+      <div
+        className={`w-11 h-11 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 ring-2 ring-green-500 ${colors[idx]}`}
+      >
+        {name.charAt(0).toUpperCase()}
+      </div>
+      {isLinkedIn && (
+        <span className="absolute -bottom-1 -right-1 bg-green-500 text-white text-[9px] font-bold px-1 rounded leading-tight z-10">
+          FALLBACK
+        </span>
+      )}
     </div>
   );
 }
@@ -255,7 +280,7 @@ export default function Inbox() {
                         }`}
                     >
                       <div className="relative shrink-0">
-                        <Avatar name={conv.contactName} src={conv.contactAvatarUrl} />
+                        <Avatar name={conv.contactName} src={conv.contactAvatarUrl} platform={conv.platform} />
                         {!conv.isRead && conv.unreadCount > 0 && (
                           <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-blue-500 rounded-full border-2 border-white" />
                         )}
@@ -397,7 +422,7 @@ function ConversationView({ id }: { id: string }) {
       <div className="px-6 py-4 border-b border-gray-100/80 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <Avatar name={conv.contactName} src={conv.contactAvatarUrl} />
+            <Avatar name={conv.contactName} src={conv.contactAvatarUrl} platform={conv.platform} />
           </div>
           <div>
             <div className="flex items-center gap-2">
