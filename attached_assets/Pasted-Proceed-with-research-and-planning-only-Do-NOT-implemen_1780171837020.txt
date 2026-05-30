@@ -1,0 +1,196 @@
+Proceed with research and planning only.
+
+Do NOT implement anything yet.
+
+I want to explore adding a Kinso-style AI Contact Intelligence system inside Xanda.
+
+Reference concept:
+
+A contact profile that automatically builds a unified memory layer across all connected platforms (WhatsApp, Instagram, LinkedIn, Gmail, Outlook, Telegram, etc.) and helps users remember everything important about a person.
+
+GOAL
+
+Transform Xanda from a messaging aggregator into a relationship intelligence platform.
+
+I want every contact to become an AI-powered profile with memory, context, history, insights, and relationship intelligence.
+
+RESEARCH TASK
+
+Analyze the existing Xanda architecture and determine:
+
+1. What data already exists in the database that can be used for this feature.
+
+Examples:
+
+* Messages
+* Contact names
+* Email threads
+* Platform identities
+* Avatars
+* Conversation history
+* Attachments
+* Notes
+* AI summaries
+
+2. What additional data models would be required.
+
+Examples:
+
+* Unified Contact Entity
+* Contact Memory Store
+* AI Relationship Summary
+* Interaction Timeline
+* Personal Facts Database
+* Meeting Notes
+* Preferences
+* Interests
+* Goals
+* Follow-up reminders
+
+3. How contact identity resolution should work.
+
+Example:
+
+The same person may appear as:
+
+* WhatsApp: Himanshu
+* Gmail: [himesh@gmail.com](mailto:himesh@gmail.com)
+* LinkedIn: Himesh Bhowmik
+* Instagram: @thehimez
+
+Investigate:
+
+* Can these be merged into one contact profile?
+* What matching confidence system should be used?
+* What manual merge tools are needed?
+* What automatic merge possibilities exist?
+
+4. Design the Contact Intelligence Architecture.
+
+I want analysis of:
+
+* Backend architecture
+* Database design
+* AI memory layer
+* Contact graph system
+* Timeline engine
+* Search architecture
+
+5. AI Features Possibilities
+
+Investigate all realistic features we can build:
+
+Examples:
+
+* Contact summary
+* Relationship summary
+* Important facts
+* Last discussed topics
+* Meeting preparation
+* Follow-up reminders
+* Sentiment history
+* Shared interests
+* Personal preferences
+* Important dates
+* Context before messaging
+* Conversation memory
+* Action item extraction
+
+6. Contact Profile Page
+
+Design a dedicated contact profile experience.
+
+Research what sections should exist.
+
+Possible sections:
+
+* Overview
+* Timeline
+* AI Summary
+* Platforms
+* Notes
+* Attachments
+* Shared Links
+* Action Items
+* Meetings
+* Relationship Health
+* Follow-ups
+
+7. Unified Timeline
+
+Investigate how messages from multiple platforms can be merged into a single chronological timeline.
+
+Example:
+
+WhatsApp message
+↓
+LinkedIn message
+↓
+Email thread
+↓
+Instagram DM
+
+all under the same person.
+
+8. Privacy & AI Memory Considerations
+
+Research:
+
+* What should be stored
+* What should not be stored
+* User controls
+* Memory deletion
+* Contact unlinking
+
+9. Implementation Roadmap
+
+Provide:
+
+Phase 1 (MVP)
+
+Phase 2
+
+Phase 3
+
+Phase 4
+
+For each phase include:
+
+* Complexity
+* Database changes
+* Backend work
+* Frontend work
+* AI work
+
+10. Competitive Analysis
+
+Compare this feature direction with:
+
+* Kinso
+* Clay
+* Dex
+* Superhuman
+* Folk
+* Attio
+* Notion Contacts
+
+Explain where Xanda can become stronger because it already owns the unified messaging layer.
+
+IMPORTANT
+
+I do not want code.
+
+I do not want implementation.
+
+I want a deep product architecture report.
+
+At the end provide:
+
+* Technical feasibility score (1–10)
+* Complexity score (1–10)
+* Estimated development phases
+* Biggest challenges
+* Highest-leverage opportunities
+* Recommended final architecture for Xanda
+
+Think like a senior product architect building the relationship layer for the future of communication.
