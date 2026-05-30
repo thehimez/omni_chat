@@ -14,6 +14,7 @@ import webhooksRouter from "./webhooks";
 import adminRouter from "./admin";
 import unipoleDiagnosticRouter from "./unipile-diagnostic";
 import eventsRouter from "./events";
+import avatarProxyRouter from "./avatar-proxy";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(webhooksRouter);
 router.use(adminRouter);
 router.use(unipoleDiagnosticRouter);
 router.use(eventsRouter);
+router.use(avatarProxyRouter);
 
 export default router;

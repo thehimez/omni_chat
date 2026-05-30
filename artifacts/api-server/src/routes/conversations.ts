@@ -13,6 +13,12 @@ import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
 
+function toProxyUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (!url.startsWith("http://") && !url.startsWith("https://")) return null;
+  return `/api/avatar-proxy?url=${encodeURIComponent(url)}`;
+}
+
 // WhatsApp ghost-conversation filter.
 // Hides WhatsApp DM conversations that have zero messages and zero unread — these are
 // chats updated by reactions, calls, or protocol events with no readable content.
@@ -59,7 +65,7 @@ router.get("/conversations", requireAuth, async (req: Request, res: Response): P
       id: c.id,
       platform: c.platform,
       contactName: c.contactName,
-      contactAvatarUrl: c.contactAvatarUrl ?? null,
+      contactAvatarUrl: toProxyUrl(c.contactAvatarUrl),
       contactId: c.contactId ?? null,
       topicLabel: c.topicLabel ?? null,
       headline: c.headline ?? null,
@@ -99,7 +105,7 @@ router.get("/conversations/:id", requireAuth, async (req: Request, res: Response
     id: conversation[0].id,
     platform: conversation[0].platform,
     contactName: conversation[0].contactName,
-    contactAvatarUrl: conversation[0].contactAvatarUrl ?? null,
+    contactAvatarUrl: toProxyUrl(conversation[0].contactAvatarUrl),
     contactId: conversation[0].contactId ?? null,
     topicLabel: conversation[0].topicLabel ?? null,
     priority: conversation[0].priority,
@@ -111,7 +117,7 @@ router.get("/conversations/:id", requireAuth, async (req: Request, res: Response
       bodyText: m.bodyText,
       bodyHtml: m.bodyHtml ?? null,
       senderName: m.senderName,
-      senderAvatarUrl: m.senderAvatarUrl ?? null,
+      senderAvatarUrl: toProxyUrl(m.senderAvatarUrl),
       headline: m.headline ?? null,
       sentAt: m.sentAt.toISOString(),
       isRead: m.isRead,
