@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq, desc, and, ilike } from "drizzle-orm";
+import { eq, desc, and, ilike, sql } from "drizzle-orm";
 import { db, conversationsTable, messagesTable } from "@workspace/db";
 import {
   GetConversationsQueryParams,
@@ -13,6 +13,22 @@ import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
 
+// WhatsApp ghost-conversation filter.
+// Hides WhatsApp DM conversations that have zero messages and zero unread — these are
+// chats updated by reactions, calls, or protocol events with no readable content.
+// Matches WhatsApp Web behaviour. Data is never deleted; only hidden from the list view.
+// A conversation re-appears automatically the moment a real message is stored.
+const hideWhatsAppGhosts = sql`NOT (
+  conversations.platform = 'whatsapp'
+  AND COALESCE(conversations.provider_chat_id, '') NOT LIKE '%@g.us'
+  AND COALESCE(conversations.provider_chat_id, '') NOT LIKE '%@newsletter'
+  AND COALESCE(conversations.provider_chat_id, '') <> '0@s.whatsapp.net'
+  AND conversations.unread_count = 0
+  AND NOT EXISTS (
+    SELECT 1 FROM messages WHERE messages.conversation_id = conversations.id
+  )
+)`;
+
 router.get("/conversations", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const user = (req as any).user;
   const parsed = GetConversationsQueryParams.safeParse(req.query);
@@ -21,7 +37,7 @@ router.get("/conversations", requireAuth, async (req: Request, res: Response): P
   const platform = parsed.success ? parsed.data.platform : undefined;
   const priority = parsed.success ? parsed.data.priority : undefined;
 
-  const whereConditions = [eq(conversationsTable.userId, user.id)];
+  const whereConditions = [eq(conversationsTable.userId, user.id), hideWhatsAppGhosts];
   if (platform) whereConditions.push(eq(conversationsTable.platform, platform));
   if (priority) whereConditions.push(eq(conversationsTable.priority, priority));
 
