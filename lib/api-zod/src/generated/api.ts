@@ -67,7 +67,10 @@ export const GetBriefingResponse = zod.object({
   "priority": zod.string(),
   "isRead": zod.boolean(),
   "lastMessageAt": zod.string(),
-  "unreadCount": zod.number()
+  "unreadCount": zod.number(),
+  "aiActionScore": zod.number().nullish(),
+  "aiActionLabel": zod.string().nullish(),
+  "aiTopicLabel": zod.string().nullish()
 })).optional()
 })
 

@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq, desc, and, count } from "drizzle-orm";
-import { db, conversationsTable, messagesTable } from "@workspace/db";
+import { eq, desc, and, ne } from "drizzle-orm";
+import { db, conversationsTable } from "@workspace/db";
 import { GetBriefingResponse } from "@workspace/api-zod";
 import { requireAuth } from "../middleware/auth";
 
@@ -23,35 +23,48 @@ router.get("/briefing", requireAuth, async (req: Request, res: Response): Promis
   };
   const greeting = greetings[timeOfDay] ?? `Hello, ${firstName}.`;
 
+  // Fetch recent conversations for stats
   const conversations = await db
     .select()
     .from(conversationsTable)
     .where(eq(conversationsTable.userId, user.id))
     .orderBy(desc(conversationsTable.lastMessageAt))
-    .limit(50);
+    .limit(100);
+
+  // Fetch AI-detected action items (unseen only), sorted by score
+  const actionItems = await db
+    .select()
+    .from(conversationsTable)
+    .where(
+      and(
+        eq(conversationsTable.userId, user.id),
+        eq(conversationsTable.aiActionRequired, true),
+        ne(conversationsTable.aiActionStatus, "seen"),
+      ),
+    )
+    .orderBy(desc(conversationsTable.aiActionScore))
+    .limit(5);
 
   const unreadCount = conversations.filter((c) => !c.isRead).length;
-  const unansweredCount = conversations.filter(
-    (c) => !c.isRead && c.priority === "high" || c.priority === "urgent"
-  ).length;
+  const actionCount = actionItems.length;
 
-  const topPriority = conversations
-    .filter((c) => c.priority === "urgent" || c.priority === "high")
-    .slice(0, 5)
-    .map((c) => ({
-      id: c.id,
-      platform: c.platform,
-      contactName: c.contactName,
-      contactAvatarUrl: c.contactAvatarUrl ?? null,
-      contactId: c.contactId ?? null,
-      topicLabel: c.topicLabel ?? null,
-      headline: c.headline ?? null,
-      preview: null,
-      priority: c.priority,
-      isRead: c.isRead,
-      lastMessageAt: c.lastMessageAt.toISOString(),
-      unreadCount: c.unreadCount,
-    }));
+  const topPriority = actionItems.map((c) => ({
+    id: c.id,
+    platform: c.platform,
+    contactName: c.contactName,
+    contactAvatarUrl: c.contactAvatarUrl ?? null,
+    contactId: c.contactId ?? null,
+    topicLabel: c.aiTopicLabel ?? c.topicLabel ?? null,
+    headline: c.headline ?? null,
+    preview: null,
+    priority: "urgent",
+    isRead: c.isRead,
+    lastMessageAt: c.lastMessageAt.toISOString(),
+    unreadCount: c.unreadCount,
+    aiActionScore: c.aiActionScore ?? null,
+    aiActionLabel: c.aiActionLabel ?? null,
+    aiTopicLabel: c.aiTopicLabel ?? null,
+  }));
 
   let inboxState = "clear";
   if (unreadCount > 20) inboxState = "busy";
@@ -59,9 +72,11 @@ router.get("/briefing", requireAuth, async (req: Request, res: Response): Promis
 
   const xanSummary = conversations.length === 0
     ? "Your inbox is empty. Connect your accounts to get started."
+    : actionCount > 0
+    ? `You have ${actionCount} message${actionCount === 1 ? "" : "s"} that need${actionCount === 1 ? "s" : ""} your attention.`
     : unreadCount > 0
-    ? `You have ${unreadCount} unread message${unreadCount === 1 ? "" : "s"}.${unansweredCount > 0 ? ` ${unansweredCount} need${unansweredCount === 1 ? "s" : ""} your attention.` : ""}`
-    : "You're all caught up.";
+    ? `You have ${unreadCount} unread message${unreadCount === 1 ? "" : "s"}. No action required.`
+    : "You're all caught up. No action items.";
 
   res.json(GetBriefingResponse.parse({
     greeting,
@@ -70,7 +85,7 @@ router.get("/briefing", requireAuth, async (req: Request, res: Response): Promis
     activeConversationCount: conversations.length,
     inboxState,
     xanSummary,
-    unansweredCount,
+    unansweredCount: actionCount,
     topPriorityConversations: topPriority,
   }));
 });

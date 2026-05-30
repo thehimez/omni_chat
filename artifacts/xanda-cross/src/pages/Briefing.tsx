@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlatformIcon } from "@/components/platform-icon";
 import { Link } from "wouter";
-import { Bot, Clock, MessageSquare, Zap, TrendingUp } from "lucide-react";
+import { Bot, Clock, MessageSquare, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Briefing() {
@@ -95,68 +95,94 @@ export default function Briefing() {
             color="blue"
           />
           <StatCard
-            icon={<TrendingUp className="w-4 h-4 text-violet-500" />}
-            label="Unanswered"
+            icon={<Zap className="w-4 h-4 text-violet-500" />}
+            label="Action Items"
             value={String(briefing.unansweredCount)}
             color="violet"
           />
         </motion.div>
 
-        {/* Priority conversations */}
+        {/* AI Action Items */}
         {briefing.topPriorityConversations &&
-          briefing.topPriorityConversations.length > 0 && (
+          briefing.topPriorityConversations.length > 0 ? (
             <motion.div variants={stagger.item} className="space-y-3">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider px-1">
-                Top Priority
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider px-1 flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5 text-amber-500" />
+                Action Items
               </h2>
-              {briefing.topPriorityConversations.map((conv) => (
-                <Link key={conv.id} href={`/inbox?id=${conv.id}`}>
-                  <motion.div
-                    whileHover={{ y: -2 }}
-                    className="bg-white/80 backdrop-blur-xl rounded-3xl p-4 border border-white/70 shadow-[0_2px_16px_rgba(0,0,0,0.05)] cursor-pointer hover:shadow-[0_6px_24px_rgba(0,0,0,0.09)] transition-all duration-200 flex items-center gap-4"
-                  >
-                    <div className="w-4 h-10 rounded-full bg-gradient-to-b from-red-400 to-rose-500 shrink-0" />
+              {briefing.topPriorityConversations.map((conv) => {
+                const score = (conv as any).aiActionScore ?? 0;
+                const actionLabel = (conv as any).aiActionLabel;
+                const aiTopicLabel = (conv as any).aiTopicLabel ?? conv.topicLabel;
+                const badgeText = score >= 90 ? "CRITICAL" : score >= 70 ? "HIGH" : "MEDIUM";
+                const badgeCls = score >= 90
+                  ? "bg-rose-600 text-white"
+                  : score >= 70
+                    ? "bg-orange-500 text-white"
+                    : "bg-amber-400 text-white";
+                const accentCls = score >= 90
+                  ? "from-rose-400 to-rose-600"
+                  : score >= 70
+                    ? "from-orange-400 to-orange-600"
+                    : "from-amber-400 to-amber-500";
 
-                    <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden shrink-0 font-semibold text-gray-600">
-                      {conv.contactAvatarUrl ? (
-                        <img
-                          src={conv.contactAvatarUrl}
-                          alt={conv.contactName}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        conv.contactName.charAt(0)
-                      )}
-                    </div>
+                return (
+                  <Link key={conv.id} href={`/inbox?id=${conv.id}`}>
+                    <motion.div
+                      whileHover={{ y: -2 }}
+                      className="bg-white/80 backdrop-blur-xl rounded-3xl p-4 border border-white/70 shadow-[0_2px_16px_rgba(0,0,0,0.05)] cursor-pointer hover:shadow-[0_6px_24px_rgba(0,0,0,0.09)] transition-all duration-200 flex items-center gap-4"
+                    >
+                      <div className={`w-4 h-10 rounded-full bg-gradient-to-b ${accentCls} shrink-0`} />
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="font-semibold text-gray-900 text-sm">
-                          {conv.contactName}
-                        </span>
-                        <PlatformIcon platform={conv.platform} className="w-3.5 h-3.5" />
-                        {conv.topicLabel && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">
-                            {conv.topicLabel}
-                          </span>
+                      <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden shrink-0 font-semibold text-gray-600">
+                        {conv.contactAvatarUrl ? (
+                          <img
+                            src={conv.contactAvatarUrl}
+                            alt={conv.contactName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          conv.contactName.charAt(0)
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 truncate">
-                        {conv.headline || conv.preview}
-                      </p>
-                    </div>
 
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-500 font-semibold uppercase tracking-wide">
-                        Urgent
-                      </span>
-                      <span className="text-[11px] text-gray-400">
-                        {format(new Date(conv.lastMessageAt), "h:mm a")}
-                      </span>
-                    </div>
-                  </motion.div>
-                </Link>
-              ))}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="font-semibold text-gray-900 text-sm">
+                            {conv.contactName}
+                          </span>
+                          <PlatformIcon platform={conv.platform} className="w-3.5 h-3.5" />
+                          {aiTopicLabel && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">
+                              {aiTopicLabel}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 truncate">
+                          {actionLabel || conv.headline || conv.preview}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide ${badgeCls}`}>
+                          {badgeText}
+                        </span>
+                        <span className="text-[11px] text-gray-400">
+                          {format(new Date(conv.lastMessageAt), "h:mm a")}
+                        </span>
+                      </div>
+                    </motion.div>
+                  </Link>
+                );
+              })}
+            </motion.div>
+          ) : (
+            <motion.div variants={stagger.item} className="bg-white/60 backdrop-blur-xl rounded-3xl p-6 border border-white/70 text-center">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-3">
+                <Zap className="w-5 h-5 text-emerald-400" />
+              </div>
+              <p className="text-sm font-medium text-gray-700 mb-1">No action items</p>
+              <p className="text-xs text-gray-400">You're all caught up. Xan will alert you when something needs attention.</p>
             </motion.div>
           )}
       </motion.div>
